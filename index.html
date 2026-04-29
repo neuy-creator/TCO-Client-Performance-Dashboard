@@ -303,7 +303,7 @@ tr:hover td{background:rgba(118,92,255,.04)}
       <div class="tbl-wrap" style="margin-bottom:20px" id="moTableIG"></div>
 
       <!-- Content Breakdown -->
-      <hr class="sec-div">
+      <hr class="sec-div" id="pdf-break-mo">
       <div class="sub-hdr">Content Breakdown</div>
       <div class="chart-row c-2">
         <div class="chart-box">
@@ -962,74 +962,99 @@ async function downloadPDF(panelId, sectionTitle){
     panel.style.height = 'auto';
     panel.style.overflow = 'visible';
 
-    // Let layout re-paint
     await new Promise(r => setTimeout(r, 120));
     sub.textContent = 'Rendering charts…';
     await new Promise(r => setTimeout(r, 80));
-
-    const canvas = await html2canvas(panel, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: panel.scrollWidth + 48,
-      logging: false
-    });
-
-    // Restore layout
-    contentEl.style.overflow = origContentOverflow;
-    contentEl.style.height = origContentHeight;
-    panel.style.height = origPanelHeight;
-    panel.style.overflow = origPanelOverflow;
-
-    sub.textContent = 'Building PDF…';
-    await new Promise(r => setTimeout(r, 40));
 
     // A4 dimensions in mm (portrait)
     const PAGE_W = 210, PAGE_H = 297, MARGIN = 12;
     const contentW = PAGE_W - MARGIN * 2;
     const contentH = PAGE_H - MARGIN * 2;
+    const isDarkNow = document.documentElement.getAttribute('data-theme')==='dark';
+    const bgFill = isDarkNow ? '#111111' : '#F0F2F8';
 
-    // Image dimensions scaled to fit page width
-    const imgW = contentW;
-    const imgH = (canvas.height / canvas.width) * imgW;
-
-    const pdf = new jsPDF('p', 'mm', 'a4');
-
-    // Add brand + section header on each page
-    function addPageHeader(pdf, pageNum, totalPages){
-      pdf.setFontSize(8);
-      pdf.setTextColor(150);
-      pdf.text('The Chosen One Agency  ·  '+brand+' — '+sectionTitle, MARGIN, MARGIN - 3);
-      pdf.text('Page '+pageNum, PAGE_W - MARGIN, MARGIN - 3, {align:'right'});
-      pdf.setTextColor(30);
+    // Helper: capture a canvas of the panel with some elements hidden (display:none so layout collapses)
+    async function capturePanel(hideEls){
+      const origDisplays=hideEls.map(e=>e.style.display);
+      hideEls.forEach(e=>e.style.display='none');
+      await new Promise(r=>setTimeout(r,80));
+      const c = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:panel.scrollWidth+48,logging:false});
+      hideEls.forEach((e,i)=>e.style.display=origDisplays[i]);
+      return c;
     }
 
-    // Slice the canvas into A4 pages
-    const totalPages = Math.ceil(imgH / contentH);
-    const srcPageH = (contentH / imgH) * canvas.height;
+    // Helper: add all pages from a canvas to pdf
+    let pageCount = 0;
+    const pdf = new jsPDF('p','mm','a4');
+    function addPageHeader(pageNum){
+      pdf.setFontSize(8);pdf.setTextColor(150);
+      pdf.text('The Chosen One Agency  ·  '+brand+' — '+sectionTitle, MARGIN, MARGIN-3);
+      pdf.text('Page '+pageNum, PAGE_W-MARGIN, MARGIN-3,{align:'right'});
+      pdf.setTextColor(30);
+    }
+    function addCanvasToPDF(canvas){
+      const imgH=(canvas.height/canvas.width)*contentW;
+      const srcPageH=(contentH/imgH)*canvas.height;
+      let srcY=0;
+      while(srcY<canvas.height){
+        if(pageCount>0) pdf.addPage();
+        pageCount++;
+        const srcH=Math.min(srcPageH,canvas.height-srcY);
+        const sliceH=(srcH/canvas.height)*imgH;
+        const slice=document.createElement('canvas');
+        slice.width=canvas.width;slice.height=srcH;
+        const ctx=slice.getContext('2d');
+        ctx.fillStyle=bgFill;ctx.fillRect(0,0,slice.width,slice.height);
+        ctx.drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,srcH);
+        addPageHeader(pageCount);
+        pdf.addImage(slice.toDataURL('image/jpeg',0.92),'JPEG',MARGIN,MARGIN,contentW,sliceH);
+        srcY+=srcPageH;
+      }
+    }
 
-    for(let p = 0; p < totalPages; p++){
-      if(p > 0) pdf.addPage();
+    // For Monthly Trends: capture Part1 (metrics+tables) and Part2 (content breakdown+top posts) separately
+    if(panelId==='mo'){
+      const breakEl=document.getElementById('pdf-break-mo');
+      // Collect all elements from breakEl onwards (part2)
+      const part2Els=[];
+      let el=breakEl;
+      while(el){part2Els.push(el);el=el.nextElementSibling;}
+      // Collect all elements before breakEl to hide for Part 2 capture (keep sec-hdr for title)
+      const part1HideEls=[];
+      el=panel.firstElementChild;
+      while(el&&el!==breakEl){
+        if(!el.classList.contains('sec-hdr')) part1HideEls.push(el);
+        el=el.nextElementSibling;
+      }
+      // Also hide the PDF button during both captures
+      const pdfBtnEl=document.getElementById('pdf-btn-'+panelId);
+      if(pdfBtnEl&&!part1HideEls.includes(pdfBtnEl)) part1HideEls.push(pdfBtnEl);
 
-      const srcY = p * srcPageH;
-      const srcH = Math.min(srcPageH, canvas.height - srcY);
-      const sliceImgH = (srcH / canvas.height) * imgH;
+      sub.textContent='Capturing Monthly Performance…';
+      const canvas1=await capturePanel(part2Els);
 
-      // Crop this page slice
-      const slice = document.createElement('canvas');
-      slice.width = canvas.width;
-      slice.height = srcH;
-      const ctx = slice.getContext('2d');
-      // Fill background
-      const isDarkNow = document.documentElement.getAttribute('data-theme')==='dark';
-      ctx.fillStyle = isDarkNow ? '#111111' : '#F0F2F8';
-      ctx.fillRect(0, 0, slice.width, slice.height);
-      ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+      sub.textContent='Capturing Content Breakdown…';
+      const canvas2=await capturePanel(part1HideEls);
 
-      addPageHeader(pdf, p+1, totalPages);
-      pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN, MARGIN, contentW, sliceImgH);
+      // Restore layout
+      contentEl.style.overflow=origContentOverflow;contentEl.style.height=origContentHeight;
+      panel.style.height=origPanelHeight;panel.style.overflow=origPanelOverflow;
+
+      sub.textContent='Building PDF…';
+      await new Promise(r=>setTimeout(r,40));
+      addCanvasToPDF(canvas1);
+      addCanvasToPDF(canvas2);
+
+    } else {
+      // Other panels: single capture
+      const canvas = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:panel.scrollWidth+48,logging:false});
+
+      contentEl.style.overflow=origContentOverflow;contentEl.style.height=origContentHeight;
+      panel.style.height=origPanelHeight;panel.style.overflow=origPanelOverflow;
+
+      sub.textContent='Building PDF…';
+      await new Promise(r=>setTimeout(r,40));
+      addCanvasToPDF(canvas);
     }
 
     // Add footer on last page
