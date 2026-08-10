@@ -1171,7 +1171,7 @@ async function downloadPDF(panelId, sectionTitle){
     const PAGE_W = 297, PAGE_H = 210, MARGIN = 8;
     const contentW = PAGE_W - MARGIN * 2;
     const contentH = PAGE_H - MARGIN * 2;
-    const CAPTURE_W = 848; // 1060 ÷ 1.25 = 125% zoom equivalent
+    const CAPTURE_W = 1060; // 100% — matches screen size 1:1
     const isDarkNow = document.documentElement.getAttribute('data-theme')==='dark';
     const bgFill = isDarkNow ? '#111111' : '#F0F2F8';
 
