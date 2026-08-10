@@ -3,7 +3,7 @@
 // ============================================================
 
 const SHEET_ORGANIC = 'Brand Data (Industry) - Organic';
-const SHEET_CONTENT = 'Brand Data (Industry) - Content';
+const SHEET_CONTENT = 'Brand Data (Industry) - Content Performance';
 const SHEET_SUMMARY = 'Brand Summary - Organic';
 
 // ============================================================
