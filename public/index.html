@@ -462,6 +462,15 @@ function growthBadge(c,p){
 }
 function getInd(b){const r=RAW_ORGANIC.find(x=>x.brand===b);return r?r.industry:'OTHER INDUSTRY';}
 function getMonths(b){return[...new Set(RAW_ORGANIC.filter(r=>r.brand===b).map(r=>r.month))].sort();}
+// Loose brand match: content sheet sometimes uses shorter names (e.g. "Tempo" vs "Tempo Bar (Le Meridien)")
+function matchContent(brand){
+  const bl=brand.toLowerCase().replace(/\s*\(.*\)\s*/g,'').trim();
+  return RAW_CONTENT.filter(r=>{
+    if(r.brand===brand)return true;
+    const rl=r.brand.toLowerCase().replace(/\s*\(.*\)\s*/g,'').trim();
+    return rl===bl||rl.startsWith(bl)||bl.startsWith(rl);
+  });
+}
 function filterPd(months){
   if(periodFrom==='all'&&periodTo==='all')return months;
   return months.filter(m=>{
@@ -712,7 +721,7 @@ function renderMO(){
   const C=getChartOpts();
   const rows=RAW_ORGANIC.filter(r=>r.brand===brand);
   const months=getMonths(brand);
-  const cRows=RAW_CONTENT.filter(r=>r.brand===brand);
+  const cRows=matchContent(brand);
   const cMonths=[...new Set(cRows.map(r=>r.month))].sort();
   document.getElementById('mo-b').textContent=months.length?fmtM(months[0])+' – '+fmtM(months[months.length-1]):'—';
 
@@ -813,7 +822,7 @@ function renderMO(){
 // ── CONTENT BREAKDOWN ─────────────────────────────────────────
 function renderCB(){
   const C=getChartOpts();
-  const cRows=RAW_CONTENT.filter(r=>r.brand===brand);
+  const cRows=matchContent(brand);
   const cMonths=[...new Set(cRows.map(r=>r.month))].sort();
   document.getElementById('cb-b').textContent=cMonths.length?fmtM(cMonths[0])+' – '+fmtM(cMonths[cMonths.length-1]):'—';
 
@@ -856,7 +865,7 @@ function setPostFilter(f){
 }
 function renderTopPosts(){
   const sortKey=document.getElementById('postSort')?.value||'engagement';
-  let rows=RAW_CONTENT.filter(r=>r.brand===brand);
+  let rows=matchContent(brand);
   if(postTypeFilter!=='all')rows=rows.filter(r=>r.type===postTypeFilter);
   rows=rows.filter(r=>r[sortKey]!=null).sort((a,b)=>b[sortKey]-a[sortKey]).slice(0,15);
   if(!rows.length){document.getElementById('topPostsTable').innerHTML='<div class="no-data">No posts found for this selection</div>';return;}
@@ -1021,7 +1030,7 @@ function renderBM(){
 }
 
 function generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA,showIndustry){
-  const cRows=RAW_CONTENT.filter(r=>r.brand===brand);
+  const cRows=matchContent(brand);
   const allM=getMonths(brand);
 
   // ── Brand-level metrics ──────────────────────────────────────
