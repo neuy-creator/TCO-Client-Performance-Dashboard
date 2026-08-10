@@ -1278,21 +1278,28 @@ async function downloadPDF(panelId, sectionTitle){
 async function loadData(){
   const overlay=document.getElementById('dataLoading');
   const sub=document.getElementById('dataLoadingSub');
-  // If no URL configured yet, start with empty state
-  if(!DATA_URL||DATA_URL==='PASTE_YOUR_APPS_SCRIPT_URL_HERE'){
-    if(sub) sub.textContent='No data source configured — see Code.gs for setup instructions.';
-    setTimeout(()=>{if(overlay)overlay.style.display='none';init();},1800);
-    return;
-  }
   try{
-    if(sub) sub.textContent='Fetching latest data from Google Sheets…';
-    const res=await fetch(DATA_URL+'?t='+Date.now());
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const d=await res.json();
-    RAW_ORGANIC=Array.isArray(d.organic)?d.organic:[];
-    RAW_CONTENT=Array.isArray(d.content)?d.content:[];
-    RAW_SUMMARY=Array.isArray(d.summary)?d.summary:[];
-    if(sub) sub.textContent='Data loaded — '+RAW_ORGANIC.length+' monthly records, '+RAW_CONTENT.length+' posts';
+    // Try local data.json first (manual upload workflow)
+    if(sub) sub.textContent='Loading data…';
+    let d=null;
+    try{
+      const res=await fetch('./data.json?t='+Date.now());
+      if(res.ok) d=await res.json();
+    }catch(e){}
+    // Fall back to Apps Script if no local file
+    if(!d&&DATA_URL&&DATA_URL!=='PASTE_YOUR_APPS_SCRIPT_URL_HERE'){
+      if(sub) sub.textContent='Fetching from Google Sheets…';
+      const res=await fetch(DATA_URL+'?t='+Date.now());
+      if(res.ok) d=await res.json();
+    }
+    if(d){
+      RAW_ORGANIC=Array.isArray(d.organic)?d.organic:[];
+      RAW_CONTENT=Array.isArray(d.content)?d.content:[];
+      RAW_SUMMARY=Array.isArray(d.summary)?d.summary:[];
+      if(sub) sub.textContent='Data loaded — '+RAW_ORGANIC.length+' monthly records, '+RAW_CONTENT.length+' posts';
+    } else {
+      if(sub) sub.textContent='No data source found.';
+    }
   }catch(err){
     console.error('Data load failed:',err);
     if(sub) sub.textContent='⚠ Could not load data: '+err.message;
