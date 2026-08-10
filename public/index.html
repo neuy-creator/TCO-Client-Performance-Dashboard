@@ -462,12 +462,14 @@ function growthBadge(c,p){
 }
 function getInd(b){const r=RAW_ORGANIC.find(x=>x.brand===b);return r?r.industry:'OTHER INDUSTRY';}
 function getMonths(b){return[...new Set(RAW_ORGANIC.filter(r=>r.brand===b).map(r=>r.month))].sort();}
-// Loose brand match: content sheet sometimes uses shorter names (e.g. "Tempo" vs "Tempo Bar (Le Meridien)")
+// Loose brand match: normalises extra spaces and parenthetical suffixes
+// e.g. "Erawan  Bangkok" matches "Erawan Bangkok", "Tasabiang" matches "Tasabiang Restaurant"
 function matchContent(brand){
-  const bl=brand.toLowerCase().replace(/\s*\(.*\)\s*/g,'').trim();
+  const norm=s=>s.toLowerCase().replace(/\s+/g,' ').replace(/\s*\(.*?\)\s*/g,'').trim();
+  const bl=norm(brand);
   return RAW_CONTENT.filter(r=>{
     if(r.brand===brand)return true;
-    const rl=r.brand.toLowerCase().replace(/\s*\(.*\)\s*/g,'').trim();
+    const rl=norm(r.brand);
     return rl===bl||rl.startsWith(bl)||bl.startsWith(rl);
   });
 }

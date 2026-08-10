@@ -20,14 +20,16 @@ function doGet(e) {
 }
 
 // ── Organic sheet reader ──────────────────────────────────────
-// Structure:
-//   Row 1: Title row (skip)
-//   Row 2: Platform group headers (skip)
-//   Row 3: Column headers (skip)
-//   Row 4+: Data
+// Row 1: Title row (skip)
+// Row 2: Empty (skip)
+// Row 3: Column headers (skip)
+// Row 4+: Data
+//
+// Col A=Month  B=Brand  C=Platform  D=Followers  E=Reach  F=Impressions
+// G=Engagements  H=ER%  I=Top Post Organic  J=Post Link  K=Category
+// L=Post Type  M=Top Post Boosted  N=Post Link  O=Category  P=Post Type  Q=Notes
 //
 // Industry label rows: col A = industry name, col C (Platform) = empty
-// Data rows: col C always has "Facebook" or "Instagram"
 // Month and Brand forward-fill when blank
 
 function readOrganic(ss) {
@@ -64,18 +66,20 @@ function readOrganic(ss) {
       brand:            curBrand,
       industry:         curIndustry,
       platform:         platform,
-      followers:        num(row[3]),
-      reach:            num(row[4]),
-      impressions:      num(row[5]),
-      engagements:      num(row[6]),
-      er_pct:           num(row[7]),
-      top_organic:      str(row[8]),
-      organic_category: str(row[9]),
-      organic_type:     str(row[10]),
-      top_boosted:      str(row[11]),
-      boosted_category: str(row[12]),
-      boosted_type:     str(row[13]),
-      notes:            str(row[14])
+      followers:        num(row[3]),   // D: Followers / Page Likes
+      reach:            num(row[4]),   // E: Reach / Viewer
+      impressions:      num(row[5]),   // F: Impression / Views
+      engagements:      num(row[6]),   // G: Engagements
+      er_pct:           num(row[7]),   // H: Engagement Rate (%)
+      top_organic:      str(row[8]),   // I: Top Posts (Organic)
+      organic_link:     str(row[9]),   // J: Post Link (organic)
+      organic_category: str(row[10]),  // K: Content Category (organic)
+      organic_type:     str(row[11]),  // L: Post types (organic)
+      top_boosted:      str(row[12]),  // M: Top Posts (Boosted)
+      boosted_link:     str(row[13]),  // N: Post Link (boosted)
+      boosted_category: str(row[14]),  // O: Content Category (boosted)
+      boosted_type:     str(row[15]),  // P: Post types (boosted)
+      notes:            str(row[16])   // Q: Notes
     });
   }
 
@@ -84,11 +88,12 @@ function readOrganic(ss) {
 }
 
 // ── Content Performance sheet reader ─────────────────────────
-// Columns: Month | Brand | Industry | Platform | Types | Post Title | Post Link | Category | Post Types | Engagement | Reach | View | Share | Save
-// (A)       (B)    (C)      (D)        (E)       (F)          (G)         (H)        (I)          (J)         (K)    (L)     (M)    (N)
+// Row 1: Column headers
+// Row 2+: Data with forward-fill on Month, Brand, Industry
 //
-// Row 1-3: Headers (skip)
-// Row 4+: Data with forward-fill on Month, Brand, Industry
+// Col A=Month  B=Brand  C=Industry  D=Platform  E=Types  F=Post Title
+// G=Post Link  H=Category  I=Post Types  J=Engagement  K=Reach
+// L=View  M=Share  N=Save
 
 function readContent(ss) {
   const sheet = ss.getSheetByName(SHEET_CONTENT);
@@ -118,13 +123,12 @@ function readContent(ss) {
       const m = fmtMonth(row[0]);
       if (m && /^\d{4}-\d{2}$/.test(m)) curMonth = m;
     }
-    // Forward-fill Brand and Industry
     if (row[1] !== null && row[1] !== '') curBrand    = String(row[1]).replace(/\n/g, ' ').trim();
     if (row[2] !== null && row[2] !== '') curIndustry = String(row[2]).trim().toUpperCase();
 
     if (!curMonth || !curBrand) continue;
 
-    // Normalise type — capitalise first letter so 'organic' → 'Organic'
+    // Normalise type
     const rawType = row[4] ? String(row[4]).trim() : '';
     const type = rawType.toLowerCase().startsWith('boost') ? 'Boosted'
                : rawType.toLowerCase().startsWith('organ') ? 'Organic'
@@ -136,15 +140,15 @@ function readContent(ss) {
       industry:   curIndustry,
       platform:   platform,
       type:       type,
-      title:      str(row[5]),    // Post Title
-      link:       str(row[6]),    // Post Link
-      category:   str(row[7]),    // Category
-      post_type:  str(row[8]),    // Post Types (Reels, Photo, etc.)
-      engagement: num(row[9]),    // Engagement
-      reach:      num(row[10]),   // Reach
-      views:      num(row[11]),   // View
-      shares:     num(row[12]),   // Share
-      saves:      num(row[13])    // Save
+      title:      str(row[5]),    // F: Post Title
+      link:       str(row[6]),    // G: Post Link
+      category:   str(row[7]),    // H: Category
+      post_type:  str(row[8]),    // I: Post Types
+      engagement: num(row[9]),    // J: Engagement
+      reach:      num(row[10]),   // K: Reach
+      views:      num(row[11]),   // L: View
+      shares:     num(row[12]),   // M: Share
+      saves:      num(row[13])    // N: Save
     });
   }
 
@@ -154,10 +158,13 @@ function readContent(ss) {
 }
 
 // ── Brand Summary sheet reader ────────────────────────────────
-// Structure:
-//   Row 1: Platform group headers (skip)
-//   Row 2: Column headers
-//   Row 3+: Data — Industry forward-fills when blank
+// Row 1: Platform group headers (skip)
+// Row 2: Column headers (skip)
+// Row 3+: Data
+//
+// Col A=Industry  B=Brand  C=Status  D=Period
+// E=FB Audiences Growth  F=FB Total Reach  G=FB Total Engagement
+// H=IG Audiences Growth  I=IG Reach Growth  J=IG Engagement Growth
 
 function readSummary(ss) {
   const sheet = ss.getSheetByName(SHEET_SUMMARY);
@@ -178,13 +185,14 @@ function readSummary(ss) {
     summary.push({
       industry:           curIndustry,
       brand:              brand,
-      period:             str(row[2]),
-      fb_follower_growth: num(row[3]),
-      fb_total_reach:     num(row[4]),
-      fb_total_eng:       num(row[5]),
-      ig_follower_growth: num(row[6]),
-      ig_reach_growth:    num(row[7]),
-      ig_eng_growth:      num(row[8])
+      status:             str(row[2]),   // C: Status
+      period:             str(row[3]),   // D: Data collecting period
+      fb_follower_growth: num(row[4]),   // E: FB Audiences Growth
+      fb_total_reach:     num(row[5]),   // F: FB Total Reach
+      fb_total_eng:       num(row[6]),   // G: FB Total Engagement
+      ig_follower_growth: num(row[7]),   // H: IG Audiences Growth
+      ig_reach_growth:    num(row[8]),   // I: IG Reach Growth
+      ig_eng_growth:      num(row[9])    // J: IG Engagement Growth
     });
   }
 
