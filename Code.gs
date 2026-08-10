@@ -101,38 +101,41 @@ function readContent(ss) {
   let curBrand    = '';
   let curIndustry = '';
 
-  // Try to find where data starts — look for first row where col D is Facebook/Instagram
-  // Default to row 4 (index 3), same as organic sheet
-  let startRow = 3;
-  for (let i = 0; i < Math.min(6, values.length); i++) {
-    const v = values[i][3] ? String(values[i][3]).trim().toLowerCase() : '';
-    if (v.includes('facebook') || v.includes('instagram')) { startRow = i; break; }
-  }
-
-  for (let i = startRow; i < values.length; i++) {
+  for (let i = 0; i < values.length; i++) {
     const row = values[i];
     if (row.every(v => v === null || v === '' || v === undefined)) continue;
 
-    // Normalise platform — col D
+    // Col D (index 3) must be exactly "Facebook" or "Instagram" to be a data row
     const rawPlat = row[3] ? String(row[3]).trim() : '';
-    const platform = rawPlat.toLowerCase().includes('facebook') ? 'Facebook'
-                   : rawPlat.toLowerCase().includes('instagram') ? 'Instagram'
+    const platLow = rawPlat.toLowerCase();
+    const platform = platLow === 'facebook' ? 'Facebook'
+                   : platLow === 'instagram' ? 'Instagram'
                    : null;
-    if (!platform) continue;   // skip header/label rows
+    if (!platform) continue;  // header rows, label rows, etc.
 
-    // Forward-fill Month, Brand, Industry
-    if (row[0] !== null && row[0] !== '') curMonth = fmtMonth(row[0]);
-    if (row[1] !== null && row[1] !== '') curBrand = String(row[1]).replace(/\n/g, ' ').trim();
+    // Forward-fill Month — only accept valid YYYY-MM results
+    if (row[0] !== null && row[0] !== '') {
+      const m = fmtMonth(row[0]);
+      if (m && /^\d{4}-\d{2}$/.test(m)) curMonth = m;
+    }
+    // Forward-fill Brand and Industry
+    if (row[1] !== null && row[1] !== '') curBrand    = String(row[1]).replace(/\n/g, ' ').trim();
     if (row[2] !== null && row[2] !== '') curIndustry = String(row[2]).trim().toUpperCase();
 
     if (!curMonth || !curBrand) continue;
+
+    // Normalise type — capitalise first letter so 'organic' → 'Organic'
+    const rawType = row[4] ? String(row[4]).trim() : '';
+    const type = rawType.toLowerCase().startsWith('boost') ? 'Boosted'
+               : rawType.toLowerCase().startsWith('organ') ? 'Organic'
+               : rawType || null;
 
     content.push({
       month:      curMonth,
       brand:      curBrand,
       industry:   curIndustry,
       platform:   platform,
-      type:       str(row[4]),    // Organic / Boosted
+      type:       type,
       title:      str(row[5]),    // Post Title
       link:       str(row[6]),    // Post Link
       category:   str(row[7]),    // Category
@@ -146,6 +149,7 @@ function readContent(ss) {
   }
 
   Logger.log('Content rows: ' + content.length);
+  if (content.length) Logger.log('Sample: ' + JSON.stringify(content[0]));
   return content;
 }
 

@@ -437,7 +437,7 @@ tr:hover td{background:rgba(118,92,255,.04)}
 <script>
 // ── DATA SOURCE ───────────────────────────────────────────────
 // Paste your Apps Script Web App URL here after deployment:
-const DATA_URL = 'https://script.google.com/macros/s/AKfycbxhR63wCsnHaybzPfQ31OFSE19RXJtVFI9t3Er1hy864wdCsQCpC_ilfd_3FLNZrtW4/exec';
+const DATA_URL = 'https://script.google.com/macros/s/AKfycbyY6R_dGFKuiQN7IV2yiMVyjCsnhb1YxKmwIFu-YUpSBoPVPuK4FUvav3FThw6HH1SK/exec';
 
 let RAW_ORGANIC = [];
 let RAW_CONTENT = [];
@@ -736,31 +736,51 @@ function renderMO(){
     ]},options:mxo(C,{interaction:{mode:'index',intersect:false},scales:{y:{position:'left'},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:tickC(),font:{size:10}}}}})});
   });
 
-  // Total Engagement — Organic vs Boosted
+  // Total Engagement — Organic vs Boosted (fallback to FB vs IG if no content data)
   dc('cEngSplit');
-  const hasBoosted=cRows.some(r=>r.type==='Boosted');
-  const monthsWithBoosted=cMonths.filter(m=>cRows.some(r=>r.month===m&&r.type==='Boosted'));
-  const allHaveBoosted=hasBoosted&&monthsWithBoosted.length===cMonths.length;
-  const orgEngData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Organic').map(r=>r.engagement||0)));
-  const bstEngData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Boosted').map(r=>r.engagement||0)));
-  document.getElementById('csEngSplit').textContent='Monthly engagement split by content type';
-  const engDatasets=[{label:'Organic',data:orgEngData,backgroundColor:'rgba(37,236,155,.45)',borderColor:'#25EC9B',borderWidth:1,borderRadius:3}];
-  if(hasBoosted) engDatasets.push({label:'Boosted',data:bstEngData,backgroundColor:'rgba(118,92,255,.5)',borderColor:'#765CFF',borderWidth:1,borderRadius:3});
-  CC['cEngSplit']=new Chart(document.getElementById('cEngSplit'),{type:'bar',data:{labels:cMonths.map(fmtM),datasets:engDatasets},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
-  const discTxt=!hasBoosted?'No boosted content data available for this brand.':(!allHaveBoosted?`Note: Boosted content not present in every month (${cMonths.filter(m=>!monthsWithBoosted.includes(m)).map(fmtM).join(', ')}).`:'');
-  document.getElementById('discEngSplit').textContent=discTxt;
-  document.getElementById('discEngSplit').style.display=discTxt?'block':'none';
+  if(cRows.length){
+    const hasBoosted=cRows.some(r=>r.type==='Boosted');
+    const monthsWithBoosted=cMonths.filter(m=>cRows.some(r=>r.month===m&&r.type==='Boosted'));
+    const allHaveBoosted=hasBoosted&&monthsWithBoosted.length===cMonths.length;
+    const orgEngData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Organic').map(r=>r.engagement||0)));
+    const bstEngData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Boosted').map(r=>r.engagement||0)));
+    document.getElementById('csEngSplit').textContent='Monthly engagement — Organic vs Boosted';
+    const engDatasets=[{label:'Organic',data:orgEngData,backgroundColor:'rgba(37,236,155,.45)',borderColor:'#25EC9B',borderWidth:1,borderRadius:3}];
+    if(hasBoosted) engDatasets.push({label:'Boosted',data:bstEngData,backgroundColor:'rgba(118,92,255,.5)',borderColor:'#765CFF',borderWidth:1,borderRadius:3});
+    CC['cEngSplit']=new Chart(document.getElementById('cEngSplit'),{type:'bar',data:{labels:cMonths.map(fmtM),datasets:engDatasets},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
+    const discTxt=!hasBoosted?'No boosted content data available for this brand.':(!allHaveBoosted?`Note: Boosted content not present in every month (${cMonths.filter(m=>!monthsWithBoosted.includes(m)).map(fmtM).join(', ')}).`:'');
+    document.getElementById('discEngSplit').textContent=discTxt;
+    document.getElementById('discEngSplit').style.display=discTxt?'block':'none';
+  } else {
+    // Fallback: FB vs IG total engagement from organic data
+    document.getElementById('csEngSplit').textContent='Monthly total engagement — Facebook vs Instagram';
+    document.getElementById('discEngSplit').style.display='none';
+    CC['cEngSplit']=new Chart(document.getElementById('cEngSplit'),{type:'bar',data:{labels:months.map(fmtM),datasets:[
+      {label:'Facebook',data:months.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Facebook');return r?r.engagements:null;}),backgroundColor:'rgba(74,127,232,.5)',borderColor:'#4a7fe8',borderWidth:1,borderRadius:3},
+      {label:'Instagram',data:months.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Instagram');return r?r.engagements:null;}),backgroundColor:'rgba(225,48,108,.4)',borderColor:'#E1306C',borderWidth:1,borderRadius:3}
+    ]},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
+  }
 
-  // Reach — Organic vs Boosted
+  // Reach — Organic vs Boosted (fallback to FB vs IG if no content data)
   dc('cOvB');
-  const orgRchData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Organic').map(r=>r.reach||0)));
-  const bstRchData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Boosted').map(r=>r.reach||0)));
-  const orgTotal=cRows.filter(r=>r.type==='Organic').length;
-  const boostTotal=cRows.filter(r=>r.type==='Boosted').length;
-  document.getElementById('csOvB').textContent=`Total reach split by content type — ${orgTotal} organic and ${boostTotal} boosted posts tracked`;
-  const rchDatasets=[{label:'Organic',data:orgRchData,backgroundColor:'rgba(37,236,155,.4)',borderColor:'#25EC9B',borderWidth:1,borderRadius:3}];
-  if(hasBoosted) rchDatasets.push({label:'Boosted',data:bstRchData,backgroundColor:'rgba(118,92,255,.45)',borderColor:'#765CFF',borderWidth:1,borderRadius:3});
-  CC['cOvB']=new Chart(document.getElementById('cOvB'),{type:'bar',data:{labels:cMonths.map(fmtM),datasets:rchDatasets},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
+  if(cRows.length){
+    const orgRchData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Organic').map(r=>r.reach||0)));
+    const bstRchData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Boosted').map(r=>r.reach||0)));
+    const orgTotal=cRows.filter(r=>r.type==='Organic').length;
+    const boostTotal=cRows.filter(r=>r.type==='Boosted').length;
+    const hasBst=cRows.some(r=>r.type==='Boosted');
+    document.getElementById('csOvB').textContent=`Reach split by content type — ${orgTotal} organic and ${boostTotal} boosted posts tracked`;
+    const rchDatasets=[{label:'Organic',data:orgRchData,backgroundColor:'rgba(37,236,155,.4)',borderColor:'#25EC9B',borderWidth:1,borderRadius:3}];
+    if(hasBst) rchDatasets.push({label:'Boosted',data:bstRchData,backgroundColor:'rgba(118,92,255,.45)',borderColor:'#765CFF',borderWidth:1,borderRadius:3});
+    CC['cOvB']=new Chart(document.getElementById('cOvB'),{type:'bar',data:{labels:cMonths.map(fmtM),datasets:rchDatasets},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
+  } else {
+    // Fallback: FB vs IG total reach from organic data
+    document.getElementById('csOvB').textContent='Monthly total reach — Facebook vs Instagram';
+    CC['cOvB']=new Chart(document.getElementById('cOvB'),{type:'bar',data:{labels:months.map(fmtM),datasets:[
+      {label:'Facebook',data:months.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Facebook');return r?r.reach:null;}),backgroundColor:'rgba(74,127,232,.5)',borderColor:'#4a7fe8',borderWidth:1,borderRadius:3},
+      {label:'Instagram',data:months.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Instagram');return r?r.reach:null;}),backgroundColor:'rgba(225,48,108,.4)',borderColor:'#E1306C',borderWidth:1,borderRadius:3}
+    ]},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
+  }
 
   // Monthly Summary Tables — MoM shown inline with each metric
   function buildSummaryTable(plat,elId){
