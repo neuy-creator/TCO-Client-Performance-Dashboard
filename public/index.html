@@ -896,21 +896,32 @@ function renderBM(){
         const display=val!=null?(prefix+fmtFull(val)):'—';
         return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700;margin-bottom:6px">${lbl}</div><div style="font-size:18px;font-weight:800;color:${color}">${display}</div><div style="font-size:10px;color:var(--dim);margin-top:3px">${sub||smPer2}</div></div>`;
       }
+      const bmBR2=RAW_ORGANIC.filter(r=>r.brand===brand);
+      const bmFBR2s=bmBR2.filter(r=>r.platform==='Facebook').sort((a,b)=>a.month>b.month?1:-1);
+      const bmIGR2s=bmBR2.filter(r=>r.platform==='Instagram').sort((a,b)=>a.month>b.month?1:-1);
+      const bmFBFolG2=bmFBR2s.length>=2?(bmFBR2s[bmFBR2s.length-1].followers||0)-(bmFBR2s[0].followers||0):null;
+      const bmIGFolG2=bmIGR2s.length>=2?(bmIGR2s[bmIGR2s.length-1].followers||0)-(bmIGR2s[0].followers||0):null;
+      const bmFBR2=sum(bmFBR2s.map(r=>r.reach||0));
+      const bmIGR2=sum(bmIGR2s.map(r=>r.reach||0));
+      const bmFBE2=sum(bmFBR2s.map(r=>r.engagements||0));
+      const bmIGE2=sum(bmIGR2s.map(r=>r.engagements||0));
+      const bmM2=bmBR2.map(r=>r.month).sort();
+      const bmPer2Str=bmM2.length?`${bmM2[0]} — ${bmM2[bmM2.length-1]}`:(smPer2||'');
       document.getElementById('bmSummaryContent').innerHTML=`
-        <div style="font-size:10px;color:var(--dim);margin-bottom:10px">ⓘ All metrics sourced from Brand Summary - Organic sheet · ${smPer2}</div>
+        <div style="font-size:10px;color:var(--dim);margin-bottom:10px">ⓘ All totals calculated from monthly organic data · Tracking period: ${bmPer2Str}</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
-          ${smCard2('FB Follower Growth',sm2.fb_follower_growth,'var(--purple2)','+',smPer2)}
-          ${smCard2('IG Follower Growth',sm2.ig_follower_growth,'var(--ig)','+',smPer2)}
+          ${smCard2('FB Follower Growth',bmFBFolG2,'var(--purple2)',bmFBFolG2!=null&&bmFBFolG2>=0?'+':'',bmPer2Str)}
+          ${smCard2('IG Follower Growth',bmIGFolG2,'var(--ig)',bmIGFolG2!=null&&bmIGFolG2>=0?'+':'',bmPer2Str)}
         </div>
-        <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Total Reach</div>
+        <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Cumulative Reach</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
-          ${smCard2('FB Total Reach',sm2.fb_total_reach,'var(--fb)','',smPer2)}
-          ${smCard2('IG Total Reach',sm2.ig_reach_growth,'var(--ig)','',smPer2)}
+          ${smCard2('FB Total Reach',bmFBR2,'var(--fb)','',bmPer2Str)}
+          ${smCard2('IG Total Reach',bmIGR2,'var(--ig)','',bmPer2Str)}
         </div>
-        <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Total Engagement</div>
+        <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Cumulative Engagement</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-          ${smCard2('FB Total Engagement',sm2.fb_total_eng,'var(--orange)','',smPer2)}
-          ${smCard2('IG Total Engagement',sm2.ig_eng_growth,'var(--yellow)','',smPer2)}
+          ${smCard2('FB Total Engagement',bmFBE2,'var(--orange)','',bmPer2Str)}
+          ${smCard2('IG Total Engagement',bmIGE2,'var(--yellow)','',bmPer2Str)}
         </div>`;
     }
     return;
@@ -961,21 +972,32 @@ function renderBM(){
       const display=val!=null?(prefix+fmtFull(val)):'—';
       return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700;margin-bottom:6px">${lbl}</div><div style="font-size:18px;font-weight:800;color:${color}">${display}</div><div style="font-size:10px;color:var(--dim);margin-top:3px">${sub||smPer}</div></div>`;
     }
+    const bmBR=RAW_ORGANIC.filter(r=>r.brand===brand);
+    const bmFBRows=bmBR.filter(r=>r.platform==='Facebook').sort((a,b)=>a.month>b.month?1:-1);
+    const bmIGRows=bmBR.filter(r=>r.platform==='Instagram').sort((a,b)=>a.month>b.month?1:-1);
+    const bmFBFolGrowth=bmFBRows.length>=2?(bmFBRows[bmFBRows.length-1].followers||0)-(bmFBRows[0].followers||0):null;
+    const bmIGFolGrowth=bmIGRows.length>=2?(bmIGRows[bmIGRows.length-1].followers||0)-(bmIGRows[0].followers||0):null;
+    const bmFBReach=sum(bmFBRows.map(r=>r.reach||0));
+    const bmIGReach=sum(bmIGRows.map(r=>r.reach||0));
+    const bmFBEng=sum(bmFBRows.map(r=>r.engagements||0));
+    const bmIGEng=sum(bmIGRows.map(r=>r.engagements||0));
+    const bmMonths=bmBR.map(r=>r.month).sort();
+    const bmPeriodStr=bmMonths.length?`${bmMonths[0]} — ${bmMonths[bmMonths.length-1]}`:(smPer||'');
     smHtml=`
-      <div style="font-size:10px;color:var(--dim);margin-bottom:10px">ⓘ All metrics sourced from Brand Summary - Organic sheet · ${smPer}</div>
+      <div style="font-size:10px;color:var(--dim);margin-bottom:10px">ⓘ All totals calculated from monthly organic data · Tracking period: ${bmPeriodStr}</div>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
-        ${smCard('FB Follower Growth',sm.fb_follower_growth,'var(--purple2)','+',smPer)}
-        ${smCard('IG Follower Growth',sm.ig_follower_growth,'var(--ig)','+',smPer)}
+        ${smCard('FB Follower Growth',bmFBFolGrowth,'var(--purple2)',bmFBFolGrowth!=null&&bmFBFolGrowth>=0?'+':'',bmPeriodStr)}
+        ${smCard('IG Follower Growth',bmIGFolGrowth,'var(--ig)',bmIGFolGrowth!=null&&bmIGFolGrowth>=0?'+':'',bmPeriodStr)}
       </div>
-      <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Total Reach</div>
+      <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Cumulative Reach</div>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
-        ${smCard('FB Total Reach',sm.fb_total_reach,'var(--fb)','',smPer)}
-        ${smCard('IG Total Reach',sm.ig_reach_growth,'var(--ig)','',smPer)}
+        ${smCard('FB Total Reach',bmFBReach,'var(--fb)','',bmPeriodStr)}
+        ${smCard('IG Total Reach',bmIGReach,'var(--ig)','',bmPeriodStr)}
       </div>
-      <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Total Engagement</div>
+      <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Cumulative Engagement</div>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-        ${smCard('FB Total Engagement',sm.fb_total_eng,'var(--orange)','',smPer)}
-        ${smCard('IG Total Engagement',sm.ig_eng_growth,'var(--yellow)','',smPer)}
+        ${smCard('FB Total Engagement',bmFBEng,'var(--orange)','',bmPeriodStr)}
+        ${smCard('IG Total Engagement',bmIGEng,'var(--yellow)','',bmPeriodStr)}
       </div>`;
   }
   document.getElementById('bmSummaryContent').innerHTML=smHtml;
