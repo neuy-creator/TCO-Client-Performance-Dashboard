@@ -1167,11 +1167,11 @@ async function downloadPDF(panelId, sectionTitle){
     sub.textContent = 'Rendering charts…';
     await new Promise(r => setTimeout(r, 80));
 
-    // A4 portrait — capture narrow so content fills page at readable size
-    const PAGE_W = 210, PAGE_H = 297, MARGIN = 8;
+    // A4 portrait — panel only at 635px (matches content area scale in reference PDF)
+    const PAGE_W = 210, PAGE_H = 297, MARGIN = 6;
     const contentW = PAGE_W - MARGIN * 2;
     const contentH = PAGE_H - MARGIN * 2;
-    const CAPTURE_W = 600;
+    const CAPTURE_W = 635;
     const isDarkNow = document.documentElement.getAttribute('data-theme')==='dark';
     const bgFill = isDarkNow ? '#111111' : '#F0F2F8';
 
