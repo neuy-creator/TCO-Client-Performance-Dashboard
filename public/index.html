@@ -736,34 +736,30 @@ function renderMO(){
     ]},options:mxo(C,{interaction:{mode:'index',intersect:false},scales:{y:{position:'left'},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{color:tickC(),font:{size:10}}}}})});
   });
 
-  // Total Engagement — Organic vs Boosted split
+  // Total Engagement — FB vs IG split (organic sheet has no organic/boosted engagement split)
   dc('cEngSplit');
-  const hasBoosted=cRows.some(r=>r.type==='Boosted');
-  const monthsWithBoosted=cMonths.filter(m=>cRows.some(r=>r.month===m&&r.type==='Boosted'));
+  const hasBoosted=rawBrand.some(r=>r.boosted_category);
+  const monthsWithBoosted=cMonths.filter(m=>rawBrand.some(r=>r.month===m&&r.boosted_category));
   const allHaveBoosted=hasBoosted&&monthsWithBoosted.length===cMonths.length;
-  const orgEngData=cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Organic').map(r=>r.engagement||0)));
-  const datasets=[{label:'Organic Engagement',data:orgEngData,backgroundColor:'rgba(37,236,155,.45)',borderColor:'#25EC9B',borderWidth:1,borderRadius:3}];
-  if(hasBoosted){
-    datasets.push({label:'Boosted Engagement',data:cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Boosted').map(r=>r.engagement||0))),backgroundColor:'rgba(118,92,255,.5)',borderColor:'#765CFF',borderWidth:1,borderRadius:3});
-  }
-  CC['cEngSplit']=new Chart(document.getElementById('cEngSplit'),{type:'bar',data:{labels:cMonths.map(fmtM),datasets},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
-  // Disclaimer
-  let discTxt='';
-  if(!hasBoosted) discTxt='No boosted content data available for this brand.';
-  else if(!allHaveBoosted) discTxt=`Note: Boosted content is not present in every month. Months without boosted data: ${cMonths.filter(m=>!monthsWithBoosted.includes(m)).map(fmtM).join(', ')}.`;
+  const orgEngData=cMonths.map(m=>rawBrand.filter(r=>r.month===m&&r.platform==='Facebook').reduce((s,r)=>s+(r.engagements||0),0));
+  const igEngData=cMonths.map(m=>rawBrand.filter(r=>r.month===m&&r.platform==='Instagram').reduce((s,r)=>s+(r.engagements||0),0));
+  document.getElementById('csEngSplit').textContent='Monthly engagement by platform — Facebook vs Instagram';
+  CC['cEngSplit']=new Chart(document.getElementById('cEngSplit'),{type:'bar',data:{labels:cMonths.map(fmtM),datasets:[
+    {label:'Facebook',data:orgEngData,backgroundColor:'rgba(74,127,232,.5)',borderColor:'#4a7fe8',borderWidth:1,borderRadius:3},
+    {label:'Instagram',data:igEngData,backgroundColor:'rgba(225,48,108,.4)',borderColor:'#E1306C',borderWidth:1,borderRadius:3}
+  ]},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
+  const discTxt=!hasBoosted?'No boosted content data available for this brand.':(!allHaveBoosted?`Note: Boosted content not present in every month (${cMonths.filter(m=>!monthsWithBoosted.includes(m)).map(fmtM).join(', ')}).`:'');
   document.getElementById('discEngSplit').textContent=discTxt;
   document.getElementById('discEngSplit').style.display=discTxt?'block':'none';
 
-  // Organic vs Boosted — Reach by Month
+  // Reach by Month — FB vs IG
   dc('cOvB');
-  const orgCounts=cMonths.map(m=>cRows.filter(r=>r.month===m&&r.type==='Organic').length);
-  const boostCounts=cMonths.map(m=>cRows.filter(r=>r.month===m&&r.type==='Boosted').length);
-  const orgTotal=orgCounts.reduce((a,b)=>a+b,0);
-  const boostTotal=boostCounts.reduce((a,b)=>a+b,0);
-  document.getElementById('csOvB').textContent=`Total reach split by content type — ${orgTotal} organic post${orgTotal!==1?'s':''} and ${boostTotal} boosted post${boostTotal!==1?'s':''} tracked`;
+  const fbReachData=cMonths.map(m=>rawBrand.filter(r=>r.month===m&&r.platform==='Facebook').reduce((s,r)=>s+(r.reach||0),0));
+  const igReachData=cMonths.map(m=>rawBrand.filter(r=>r.month===m&&r.platform==='Instagram').reduce((s,r)=>s+(r.reach||0),0));
+  document.getElementById('csOvB').textContent='Monthly reach by platform — Facebook vs Instagram';
   CC['cOvB']=new Chart(document.getElementById('cOvB'),{type:'bar',data:{labels:cMonths.map(fmtM),datasets:[
-    {label:'Organic',data:cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Organic').map(r=>r.reach))),backgroundColor:'rgba(37,236,155,.4)',borderColor:'#25EC9B',borderWidth:1,borderRadius:3},
-    {label:'Boosted',data:cMonths.map(m=>sum(cRows.filter(r=>r.month===m&&r.type==='Boosted').map(r=>r.reach))),backgroundColor:'rgba(118,92,255,.45)',borderColor:'#765CFF',borderWidth:1,borderRadius:3}
+    {label:'Facebook',data:fbReachData,backgroundColor:'rgba(74,127,232,.5)',borderColor:'#4a7fe8',borderWidth:1,borderRadius:3},
+    {label:'Instagram',data:igReachData,backgroundColor:'rgba(225,48,108,.4)',borderColor:'#E1306C',borderWidth:1,borderRadius:3}
   ]},options:{...mxo(C,{layout:{padding:{top:22}}}),_barLabels:true}});
 
   // Monthly Summary Tables — MoM shown inline with each metric
@@ -797,8 +793,22 @@ function renderMO(){
 // ── CONTENT BREAKDOWN ─────────────────────────────────────────
 function renderCB(){
   const C=getChartOpts();
-  const cRows=RAW_CONTENT.filter(r=>r.brand===brand);
-  const cMonths=[...new Set(cRows.map(r=>r.month))].sort();
+  // Build enriched content rows from RAW_ORGANIC (organic sheet has category/type but no per-post metrics;
+  // we map each month's total platform engagement to its top post's category)
+  const rawBrand=RAW_ORGANIC.filter(r=>r.brand===brand);
+  const cRows=[
+    ...rawBrand.filter(r=>r.organic_category).map(r=>({
+      month:r.month,platform:r.platform,type:'Organic',
+      category:r.organic_category,post_type:r.organic_type,title:r.top_organic,
+      engagement:r.engagements,reach:r.reach,views:null
+    })),
+    ...rawBrand.filter(r=>r.boosted_category).map(r=>({
+      month:r.month,platform:r.platform,type:'Boosted',
+      category:r.boosted_category,post_type:r.boosted_type,title:r.top_boosted,
+      engagement:r.engagements,reach:r.reach,views:null
+    }))
+  ];
+  const cMonths=[...new Set(rawBrand.map(r=>r.month))].sort();
   document.getElementById('cb-b').textContent=cMonths.length?fmtM(cMonths[0])+' – '+fmtM(cMonths[cMonths.length-1]):'—';
 
   const CAT_COLORS=['#765CFF','#25EC9B','#4a7fe8','#E1306C','#FF9A3C','#FFD93D','#FF5C5C','#9B85FF','#1ab578','#7fa3e0','#e070ff','#aaa'];
@@ -889,22 +899,22 @@ function renderBM(){
     if(bmPosCards){bmPosCards.innerHTML='';bmPosCards.style.display='none';}
     document.querySelectorAll('#panel-bm .chart-row.c-1,#panel-bm .chart-row.c-2').forEach(el=>{ if(!el.querySelector('#bmSummaryContent'))el.style.display='none'; });
     document.getElementById('insightsContent').innerHTML=generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA,false);
-    const sm2=RAW_SUMMARY.find(r=>r.brand===brand||r.brand.toLowerCase()===brand.toLowerCase());
-    if(sm2){
-      const smPer2=sm2.period?`Tracking period: ${sm2.period}`:'';
+    {
+      const sm2=RAW_SUMMARY.find(r=>r.brand===brand||r.brand.toLowerCase()===brand.toLowerCase());
+      const smPer2=sm2?.period||'';
       function smCard2(lbl,val,color,prefix='',sub=''){
         const display=val!=null?(prefix+fmtFull(val)):'—';
-        return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700;margin-bottom:6px">${lbl}</div><div style="font-size:18px;font-weight:800;color:${color}">${display}</div><div style="font-size:10px;color:var(--dim);margin-top:3px">${sub||smPer2}</div></div>`;
+        return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700;margin-bottom:6px">${lbl}</div><div style="font-size:18px;font-weight:800;color:${color}">${display}</div><div style="font-size:10px;color:var(--dim);margin-top:3px">${sub}</div></div>`;
       }
       const bmBR2=RAW_ORGANIC.filter(r=>r.brand===brand);
       const bmFBR2s=bmBR2.filter(r=>r.platform==='Facebook').sort((a,b)=>a.month>b.month?1:-1);
       const bmIGR2s=bmBR2.filter(r=>r.platform==='Instagram').sort((a,b)=>a.month>b.month?1:-1);
       const bmFBFolG2=bmFBR2s.length>=2?(bmFBR2s[bmFBR2s.length-1].followers||0)-(bmFBR2s[0].followers||0):null;
       const bmIGFolG2=bmIGR2s.length>=2?(bmIGR2s[bmIGR2s.length-1].followers||0)-(bmIGR2s[0].followers||0):null;
-      const bmFBR2=sum(bmFBR2s.map(r=>r.reach||0));
-      const bmIGR2=sum(bmIGR2s.map(r=>r.reach||0));
-      const bmFBE2=sum(bmFBR2s.map(r=>r.engagements||0));
-      const bmIGE2=sum(bmIGR2s.map(r=>r.engagements||0));
+      const bmFBRchTot=sum(bmFBR2s.map(r=>r.reach||0));
+      const bmIGRchTot=sum(bmIGR2s.map(r=>r.reach||0));
+      const bmFBEngTot=sum(bmFBR2s.map(r=>r.engagements||0));
+      const bmIGEngTot=sum(bmIGR2s.map(r=>r.engagements||0));
       const bmM2=bmBR2.map(r=>r.month).sort();
       const bmPer2Str=bmM2.length?`${bmM2[0]} — ${bmM2[bmM2.length-1]}`:(smPer2||'');
       document.getElementById('bmSummaryContent').innerHTML=`
@@ -915,13 +925,13 @@ function renderBM(){
         </div>
         <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Cumulative Reach</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
-          ${smCard2('FB Total Reach',bmFBR2,'var(--fb)','',bmPer2Str)}
-          ${smCard2('IG Total Reach',bmIGR2,'var(--ig)','',bmPer2Str)}
+          ${smCard2('FB Total Reach',bmFBRchTot,'var(--fb)','',bmPer2Str)}
+          ${smCard2('IG Total Reach',bmIGRchTot,'var(--ig)','',bmPer2Str)}
         </div>
         <div style="font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:10px 0 6px">Cumulative Engagement</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-          ${smCard2('FB Total Engagement',bmFBE2,'var(--orange)','',bmPer2Str)}
-          ${smCard2('IG Total Engagement',bmIGE2,'var(--yellow)','',bmPer2Str)}
+          ${smCard2('FB Total Engagement',bmFBEngTot,'var(--orange)','',bmPer2Str)}
+          ${smCard2('IG Total Engagement',bmIGEngTot,'var(--yellow)','',bmPer2Str)}
         </div>`;
     }
     return;
@@ -963,14 +973,13 @@ function renderBM(){
     {label:ind+' Average',data:[iFBER,iIGER],backgroundColor:'rgba(37,236,155,.38)',borderColor:'#25EC9B',borderWidth:1,borderRadius:5}
   ]},options:{...mxo(C,{layout:{padding:{top:22}},scales:{y:{ticks:{callback:v=>v.toFixed(2)+'%',color:tickC(),font:{size:10}}}}}),_barLabels:true,_barLabelNoPrefix:true}});
 
-  // Brand summary
-  const sm=RAW_SUMMARY.find(r=>r.brand===brand||r.brand.toLowerCase()===brand.toLowerCase());
-  let smHtml='<div class="no-data" style="font-size:12px">No summary data available for this brand.</div>';
-  if(sm){
-    const smPer=sm.period?`Tracking period: ${sm.period}`:'';
+  // Brand summary — always calculated from RAW_ORGANIC, no dependency on RAW_SUMMARY
+  {
+    const sm=RAW_SUMMARY.find(r=>r.brand===brand||r.brand.toLowerCase()===brand.toLowerCase());
+    const smPer=sm?.period||'';
     function smCard(lbl,val,color,prefix='',sub=''){
       const display=val!=null?(prefix+fmtFull(val)):'—';
-      return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700;margin-bottom:6px">${lbl}</div><div style="font-size:18px;font-weight:800;color:${color}">${display}</div><div style="font-size:10px;color:var(--dim);margin-top:3px">${sub||smPer}</div></div>`;
+      return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700;margin-bottom:6px">${lbl}</div><div style="font-size:18px;font-weight:800;color:${color}">${display}</div><div style="font-size:10px;color:var(--dim);margin-top:3px">${sub}</div></div>`;
     }
     const bmBR=RAW_ORGANIC.filter(r=>r.brand===brand);
     const bmFBRows=bmBR.filter(r=>r.platform==='Facebook').sort((a,b)=>a.month>b.month?1:-1);
@@ -983,7 +992,7 @@ function renderBM(){
     const bmIGEng=sum(bmIGRows.map(r=>r.engagements||0));
     const bmMonths=bmBR.map(r=>r.month).sort();
     const bmPeriodStr=bmMonths.length?`${bmMonths[0]} — ${bmMonths[bmMonths.length-1]}`:(smPer||'');
-    smHtml=`
+    document.getElementById('bmSummaryContent').innerHTML=`
       <div style="font-size:10px;color:var(--dim);margin-bottom:10px">ⓘ All totals calculated from monthly organic data · Tracking period: ${bmPeriodStr}</div>
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
         ${smCard('FB Follower Growth',bmFBFolGrowth,'var(--purple2)',bmFBFolGrowth!=null&&bmFBFolGrowth>=0?'+':'',bmPeriodStr)}
@@ -1000,7 +1009,6 @@ function renderBM(){
         ${smCard('IG Total Engagement',bmIGEng,'var(--yellow)','',bmPeriodStr)}
       </div>`;
   }
-  document.getElementById('bmSummaryContent').innerHTML=smHtml;
 
   // ── INSIGHTS ──────────────────────────────────────────────
   document.getElementById('insightsContent').innerHTML=generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA,['f&b','hotel','real estate'].includes(ind.toLowerCase()));
