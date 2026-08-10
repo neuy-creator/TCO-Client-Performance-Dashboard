@@ -880,14 +880,15 @@ function renderBM(){
   const igERDiff=bIGER-iIGER;
 
   // Check if there are peer brands in this industry
-  const hasPeers=indBrands.filter(b=>b!==brand).length>0;
+  const isOtherInd=ind.toLowerCase()==='other'||ind.toLowerCase()==='other industry';
+  const hasPeers=!isOtherInd&&indBrands.filter(b=>b!==brand).length>0;
   const bmPosCards=document.getElementById('bmPosCards');
   // Show/hide industry comparison based on peer availability
   const indCompEls=[bmPosCards,...document.querySelectorAll('#panel-bm .chart-row.c-2')].filter(Boolean);
   if(!hasPeers){
-    if(bmPosCards)bmPosCards.innerHTML=`<div style="padding:14px;background:var(--card2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--dim);grid-column:1/-1">ⓘ No other brands in the <strong>${ind}</strong> category are currently tracked — industry comparison is not available for this brand.</div>`;
-    document.querySelectorAll('#panel-bm .chart-row.c-2').forEach(el=>el.style.display='none');
-    document.getElementById('insightsContent').innerHTML='<div class="no-data" style="font-size:12px">Industry comparison insights are not available — no peer brands tracked in this category.</div>';
+    if(bmPosCards){bmPosCards.innerHTML='';bmPosCards.style.display='none';}
+    document.querySelectorAll('#panel-bm .chart-row.c-1,#panel-bm .chart-row.c-2').forEach(el=>{ if(!el.querySelector('#bmSummaryContent'))el.style.display='none'; });
+    document.getElementById('insightsContent').innerHTML=generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA,false);
     const sm2=RAW_SUMMARY.find(r=>r.brand===brand||r.brand.toLowerCase()===brand.toLowerCase());
     if(sm2){
       const smPer2=sm2.period?`Tracking period: ${sm2.period}`:'';
@@ -921,7 +922,8 @@ function renderBM(){
     }
     return;
   }
-  document.querySelectorAll('#panel-bm .chart-row.c-2').forEach(el=>el.style.display='');
+  document.querySelectorAll('#panel-bm .chart-row.c-1,#panel-bm .chart-row.c-2').forEach(el=>el.style.display='');
+  if(bmPosCards)bmPosCards.style.display='';
 
   // Position cards (only ER comparison — no rank)
   document.getElementById('bmPosCards').innerHTML=`
@@ -993,86 +995,113 @@ function renderBM(){
   document.getElementById('bmSummaryContent').innerHTML=smHtml;
 
   // ── INSIGHTS ──────────────────────────────────────────────
-  document.getElementById('insightsContent').innerHTML=generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA);
+  document.getElementById('insightsContent').innerHTML=generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA,['f&b','hotel','real estate'].includes(ind.toLowerCase()));
 }
 
-function generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA){
+function generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA,showIndustry){
   const cRows=RAW_CONTENT.filter(r=>r.brand===brand);
   const allM=getMonths(brand);
 
-  // Reach deltas
+  // ── Brand-level metrics ──────────────────────────────────────
   const bFBReach=bA('reach','Facebook'),bIGReach=bA('reach','Instagram');
-  const iFBReach=iA('reach','Facebook'),iIGReach=iA('reach','Instagram');
-  const fbRchPct=iFBReach>0?((bFBReach-iFBReach)/iFBReach*100):0;
-  const igRchPct=iIGReach>0?((bIGReach-iIGReach)/iIGReach*100):0;
-  const fbERDiff=bFBER-iFBER,igERDiff=bIGER-iIGER;
+  const bFBEng=bA('engagements','Facebook'),bIGEng=bA('engagements','Instagram');
 
-  // Trend (last 3 months)
+  // Reach trend — last 3 months
   const recent3=allM.slice(-3);
-  const fbTrend=recent3.map(m=>brandRows.find(r=>r.month===m&&r.platform==='Facebook')?.reach).filter(v=>v!=null);
-  const isGrowing=fbTrend.length>=2&&fbTrend[fbTrend.length-1]>fbTrend[0];
+  const fbReach3=recent3.map(m=>{const r=brandRows.find(x=>x.month===m&&x.platform==='Facebook');return r?r.reach:null;}).filter(v=>v!=null);
+  const igReach3=recent3.map(m=>{const r=brandRows.find(x=>x.month===m&&x.platform==='Instagram');return r?r.reach:null;}).filter(v=>v!=null);
+  const fbGrowing=fbReach3.length>=2&&fbReach3[fbReach3.length-1]>fbReach3[0];
+  const igGrowing=igReach3.length>=2&&igReach3[igReach3.length-1]>igReach3[0];
 
-  // Content analysis
-  const indCe={};
-  RAW_CONTENT.filter(r=>getInd(r.brand)===ind).forEach(r=>{
-    if(r.category&&r.engagement!=null){indCe[r.category]=indCe[r.category]||{s:0,n:0};indCe[r.category].s+=r.engagement;indCe[r.category].n++;}
-  });
-  const indTopCats=Object.entries(indCe).sort((a,b)=>b[1].s/b[1].n-a[1].s/a[1].n).slice(0,3).map(([k])=>k);
-  const brandCats=[...new Set(cRows.map(r=>r.category).filter(Boolean))];
+  // ER trend — last 3 months
+  const fbER3=recent3.map(m=>{const r=brandRows.find(x=>x.month===m&&x.platform==='Facebook');return r?erV(r):null;}).filter(v=>v!=null);
+  const igER3=recent3.map(m=>{const r=brandRows.find(x=>x.month===m&&x.platform==='Instagram');return r?erV(r):null;}).filter(v=>v!=null);
+  const fbERGrowing=fbER3.length>=2&&fbER3[fbER3.length-1]>fbER3[0];
+  const igERGrowing=igER3.length>=2&&igER3[igER3.length-1]>igER3[0];
+
+  // Best platform by ER
+  const fbLeadsER=bFBER>=bIGER;
+
+  // Brand content analysis
   const brandCe={};
-  cRows.forEach(r=>{if(r.category&&r.engagement!=null){brandCe[r.category]=brandCe[r.category]||{s:0,n:0};brandCe[r.category].s+=r.engagement;brandCe[r.category].n++;}});
+  cRows.forEach(r=>{if(r.category){brandCe[r.category]=brandCe[r.category]||{s:0,n:0};brandCe[r.category].s+=(r.engagement||0);brandCe[r.category].n++;}});
   const brandTopCats=Object.entries(brandCe).sort((a,b)=>b[1].s/b[1].n-a[1].s/a[1].n).slice(0,3).map(([k])=>k);
-  const overlapCats=indTopCats.filter(c=>brandCats.includes(c));
-  const uniqueTopCats=brandTopCats.filter(c=>!indTopCats.includes(c));
-  const isTrendSetter=uniqueTopCats.length>0;
+  const brandPT={};
+  cRows.forEach(r=>{if(r.post_type){brandPT[r.post_type]=brandPT[r.post_type]||{s:0,n:0};brandPT[r.post_type].s+=(r.engagement||0);brandPT[r.post_type].n++;}});
+  const topFormat=Object.entries(brandPT).sort((a,b)=>b[1].s/b[1].n-a[1].s/a[1].n)[0]?.[0];
 
-  // ── Insight 1: Overall performance ──
-  const overallGood=(fbRchPct>-15)&&(fbERDiff>=-0.2||igERDiff>=-0.2);
-  const perfColor=overallGood?'var(--mint)':'var(--orange)';
+  // ── Insight 1: Reach & Audience ────────────────────────────
+  const reachColor=fbGrowing||igGrowing?'var(--mint)':'var(--orange)';
   const ins1=`<div class="insight-card">
-    <div class="ins-label" style="color:${perfColor}">01 · Overall Performance Strategy</div>
-    <div class="ins-title">${brand} is ${overallGood?'tracking well against the industry benchmark':'showing some gaps against the industry benchmark'}.</div>
+    <div class="ins-label" style="color:${reachColor}">01 · Reach & Audience Performance</div>
+    <div class="ins-title">${brand} — ${fbGrowing&&igGrowing?'Reach growing on both platforms':fbGrowing?'Facebook reach trending up':'Instagram reach trending up' }${!fbGrowing&&!igGrowing?' — Reach softening across both platforms':''}</div>
     <div class="ins-body">
-      Facebook average reach is <strong>${Math.abs(fbRchPct).toFixed(0)}% ${fbRchPct>=0?'above':'below'}</strong> the ${ind} average
-      (${fmtFull(Math.round(bFBReach))} vs ${fmtFull(Math.round(iFBReach))}).
-      Instagram average reach is <strong>${Math.abs(igRchPct).toFixed(0)}% ${igRchPct>=0?'above':'below'}</strong> average
-      (${fmtFull(Math.round(bIGReach))} vs ${fmtFull(Math.round(iIGReach))}).
-      FB engagement rate is <strong>${fbERDiff>=0?'+':''}${fbERDiff.toFixed(2)}%</strong> vs the ${ind} baseline of ${iFBER.toFixed(2)}%.
-      IG engagement rate is <strong>${igERDiff>=0?'+':''}${igERDiff.toFixed(2)}%</strong> vs the ${ind} baseline of ${iIGER.toFixed(2)}%.
-      ${fbTrend.length>=2?(isGrowing?'Recent 3-month Facebook reach trend is <strong>upward</strong> — the strategy is gaining momentum.':'Recent 3-month Facebook reach shows a <strong>softening trend</strong> — worth reviewing content cadence.'):''}
+      Facebook average monthly reach is <strong>${fmtFull(Math.round(bFBReach))}</strong> with a ${fbGrowing?'<strong style="color:var(--mint)">upward</strong>':'<strong style="color:var(--orange)">softening</strong>'} trend over the last ${fbReach3.length} months.
+      Instagram average monthly reach is <strong>${fmtFull(Math.round(bIGReach))}</strong> with a ${igGrowing?'<strong style="color:var(--mint)">upward</strong>':'<strong style="color:var(--orange)">softening</strong>'} trend over the last ${igReach3.length} months.
+      ${bFBReach>bIGReach?`Facebook is the stronger reach channel, delivering <strong>${((bFBReach/bIGReach-1)*100).toFixed(0)}% more reach</strong> than Instagram on average.`:`Instagram is delivering comparable or stronger reach relative to Facebook for this brand.`}
     </div>
   </div>`;
 
-  // ── Insight 2: Content pattern ──
-  const patternColor=isTrendSetter?'var(--purple2)':'var(--yellow)';
-  const patternTitle=isTrendSetter?'Potential Trend-Setter in Content':'Aligned with Industry Content Patterns';
+  // ── Insight 2: Engagement & Content ────────────────────────
+  const engColor=fbERGrowing||igERGrowing?'var(--purple2)':'var(--yellow)';
   const ins2=`<div class="insight-card">
-    <div class="ins-label" style="color:${patternColor}">02 · Content Pattern — ${isTrendSetter?'Trend-Setter':'Industry Follower'}</div>
-    <div class="ins-title">${patternTitle}</div>
+    <div class="ins-label" style="color:${engColor}">02 · Engagement & Content Performance</div>
+    <div class="ins-title">${fbLeadsER?'Facebook':'Instagram'} leads in engagement rate — ${brandTopCats.length?`top content: ${brandTopCats.slice(0,2).join(' & ')}`:'content data limited'}</div>
     <div class="ins-body">
-      The highest-engaging content categories across ${ind} brands are: <strong>${indTopCats.length?indTopCats.join(', '):'insufficient data'}</strong>.
-      ${brand} is ${overlapCats.length?`actively using <strong>${overlapCats.join(', ')}</strong> — which aligns with industry best performers.`:`not currently leveraging the top-performing categories found across ${ind} peers.`}
-      ${isTrendSetter?`This brand's top engagement drivers — <strong>${uniqueTopCats.join(', ')}</strong> — are not the dominant categories across ${ind}, suggesting this brand may be setting its own content direction rather than following the trend. This can be a competitive advantage if sustained.`:''}
-      ${!isTrendSetter&&overlapCats.length<2?'There is an opportunity to deepen investment in categories that consistently drive high engagement across the industry.':''}
+      Facebook average ER is <strong>${bFBER.toFixed(2)}%</strong> (${fbERGrowing?'<span style="color:var(--mint)">trending up</span>':'<span style="color:var(--orange)">trending down</span>'} over recent months).
+      Instagram average ER is <strong>${bIGER.toFixed(2)}%</strong> (${igERGrowing?'<span style="color:var(--mint)">trending up</span>':'<span style="color:var(--orange)">trending down</span>'} over recent months).
+      ${brandTopCats.length?`The highest-engaging content categories for ${brand} are <strong>${brandTopCats.join(', ')}</strong>.`:''}
+      ${topFormat?`<strong>${topFormat}</strong> is the best-performing post format based on engagement.`:''}
     </div>
   </div>`;
 
-  // ── Insight 3: Recommendations ──
+  // ── Insight 3: Next Steps ───────────────────────────────────
   const sugs=[];
-  if(fbRchPct<-10) sugs.push({txt:`Facebook reach is <strong>${Math.abs(fbRchPct).toFixed(0)}% below</strong> the ${ind} average. Consider increasing post frequency or allocating budget to boost high-performing organic content to close the reach gap.`});
-  if(fbERDiff<-0.3) sugs.push({txt:`Facebook ER% (${bFBER.toFixed(2)}%) is below the industry average (${iFBER.toFixed(2)}%). Interactive formats — polls, questions, or challenge posts — tend to lift engagement meaningfully.`});
-  if(igERDiff<-0.3) sugs.push({txt:`Instagram ER% (${bIGER.toFixed(2)}%) lags the industry average (${iIGER.toFixed(2)}%). Short-form Reels, Stories with interaction stickers, and collab posts are proven IG engagement drivers.`});
-  if(indTopCats.length&&overlapCats.length<2) sugs.push({txt:`<strong>${indTopCats[0]}</strong> content leads engagement across ${ind} — it is currently underrepresented in ${brand}'s content mix. Testing even 1–2 posts per month in this category could surface meaningful performance data.`});
-  if(!isGrowing&&fbTrend.length>=2) sugs.push({txt:`Facebook reach has softened in the last ${fbTrend.length} tracked months. Auditing the cadence of boosted vs organic content and ensuring top organic posts are being amplified could stabilise or reverse this trend.`});
-  if(!sugs.length) sugs.push({txt:`Performance is strong across key indicators. Focus on maintaining consistency in content cadence and continue the current mix — there are no critical gaps requiring urgent action at this stage.`});
+  if(!fbGrowing&&fbReach3.length>=2) sugs.push(`Facebook reach has softened over the last ${fbReach3.length} months. Review post frequency and consider boosting top organic content to recover reach.`);
+  if(!igGrowing&&igReach3.length>=2) sugs.push(`Instagram reach is declining. Increasing Reels output and collaborating with local creators or UGC can help expand reach organically.`);
+  if(bFBER<1) sugs.push(`Facebook ER% is below 1% — introducing interactive content formats (polls, questions, countdowns) can help lift engagement meaningfully.`);
+  if(bIGER<1) sugs.push(`Instagram ER% is below 1% — Stories with stickers, Reels series, and collab posts are proven to increase interaction rates.`);
+  if(brandTopCats.length) sugs.push(`Double down on <strong>${brandTopCats[0]}</strong> content — it consistently drives the highest engagement for ${brand}. Aim for at least 2 posts per month in this category.`);
+  if(bFBReach>bIGReach*3) sugs.push(`Instagram reach is significantly lower than Facebook. A dedicated IG content push — separate creative assets optimised for vertical formats — could help close the gap.`);
+  if(!sugs.length) sugs.push(`Performance is consistent across key metrics. Focus on maintaining content cadence and continue the current mix — no critical gaps require urgent action at this stage.`);
 
   const ins3=`<div class="insight-card">
-    <div class="ins-label" style="color:var(--fb)">03 · Recommendations</div>
-    <div class="ins-title">Action points based on available data</div>
-    <div style="margin-top:10px">${sugs.map((s,i)=>`<div class="sug-item"><span class="sug-num">${i+1}</span><div class="sug-txt">${s.txt}</div></div>`).join('')}</div>
+    <div class="ins-label" style="color:var(--fb)">03 · Next Steps</div>
+    <div class="ins-title">Recommended actions based on ${brand}'s performance data</div>
+    <div style="margin-top:10px">${sugs.map((s,i)=>`<div class="sug-item"><span class="sug-num">${i+1}</span><div class="sug-txt">${s}</div></div>`).join('')}</div>
   </div>`;
 
-  return ins1+ins2+ins3;
+  // ── Insight 4: Industry Comparison (F&B, Hotel, Real Estate only) ──
+  let ins4='';
+  if(showIndustry){
+    const iFBReach=iA('reach','Facebook'),iIGReach=iA('reach','Instagram');
+    const fbRchPct=iFBReach>0?((bFBReach-iFBReach)/iFBReach*100):0;
+    const igRchPct=iIGReach>0?((bIGReach-iIGReach)/iIGReach*100):0;
+    const fbERDiff=bFBER-iFBER,igERDiff=bIGER-iIGER;
+    const indCe={};
+    RAW_CONTENT.filter(r=>getInd(r.brand)===ind).forEach(r=>{
+      if(r.category){indCe[r.category]=indCe[r.category]||{s:0,n:0};indCe[r.category].s+=(r.engagement||0);indCe[r.category].n++;}
+    });
+    const indTopCats=Object.entries(indCe).sort((a,b)=>b[1].s/b[1].n-a[1].s/a[1].n).slice(0,3).map(([k])=>k);
+    const overlapCats=indTopCats.filter(c=>brandTopCats.includes(c));
+    const uniqueTopCats=brandTopCats.filter(c=>!indTopCats.includes(c));
+    const indColor=fbRchPct>=-10&&fbERDiff>=-0.2?'var(--mint)':'var(--orange)';
+    ins4=`<div class="insight-card">
+      <div class="ins-label" style="color:${indColor}">04 · ${ind} Industry Position</div>
+      <div class="ins-title">${brand} vs ${ind} average — ${fbRchPct>=-10&&fbERDiff>=-0.2?'performing in line with or above peers':'some gaps vs industry peers'}</div>
+      <div class="ins-body">
+        Facebook reach is <strong>${Math.abs(fbRchPct).toFixed(0)}% ${fbRchPct>=0?'above':'below'}</strong> the ${ind} average (${fmtFull(Math.round(bFBReach))} vs ${fmtFull(Math.round(iFBReach))}).
+        Instagram reach is <strong>${Math.abs(igRchPct).toFixed(0)}% ${igRchPct>=0?'above':'below'}</strong> the ${ind} average (${fmtFull(Math.round(bIGReach))} vs ${fmtFull(Math.round(iIGReach))}).
+        FB ER is <strong>${fbERDiff>=0?'+':''}${fbERDiff.toFixed(2)}%</strong> vs industry baseline of ${iFBER.toFixed(2)}%.
+        IG ER is <strong>${igERDiff>=0?'+':''}${igERDiff.toFixed(2)}%</strong> vs industry baseline of ${iIGER.toFixed(2)}%.
+        ${indTopCats.length?`Top-performing content categories across ${ind}: <strong>${indTopCats.join(', ')}</strong>.`:''}
+        ${overlapCats.length?`${brand} is already leveraging <strong>${overlapCats.join(', ')}</strong> — aligned with what drives engagement across the industry.`:''}
+        ${uniqueTopCats.length?`${brand}'s unique top categories — <strong>${uniqueTopCats.join(', ')}</strong> — are not the norm across ${ind}, which could be a differentiation advantage.`:''}
+      </div>
+    </div>`;
+  }
+
+  return ins1+ins2+ins3+ins4;
 }
 
 // ── PDF DOWNLOAD ──────────────────────────────────────────────
