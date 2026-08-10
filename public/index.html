@@ -1166,15 +1166,7 @@ async function downloadPDF(panelId, sectionTitle){
     await new Promise(r => setTimeout(r, 120));
     sub.textContent = 'Rendering charts…';
 
-    // Boost Chart.js pixel ratio to 4x so chart canvases are crisp in the PDF
-    const origDPRs = {};
-    Object.entries(CC).forEach(([id, chart]) => {
-      if (!chart) return;
-      origDPRs[id] = chart.options.devicePixelRatio || window.devicePixelRatio || 1;
-      chart.options.devicePixelRatio = 4;
-      chart.resize();
-    });
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 80));
 
     // A4 portrait — fixed 1100px capture matches original Jul 22 output scale
     const PAGE_W = 210, PAGE_H = 297, MARGIN = 12;
@@ -1189,7 +1181,19 @@ async function downloadPDF(panelId, sectionTitle){
       const origDisplays=hideEls.map(e=>e.style.display);
       hideEls.forEach(e=>e.style.display='none');
       await new Promise(r=>setTimeout(r,80));
-      const c = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false});
+      const c = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false,
+        onclone:(clonedDoc)=>{
+          Object.values(CC).forEach(chart=>{
+            if(!chart||!chart.canvas.id) return;
+            const cc=clonedDoc.getElementById(chart.canvas.id);
+            if(!cc) return;
+            const ctx=cc.getContext('2d');
+            const w=chart.canvas.offsetWidth*4, h=chart.canvas.offsetHeight*4;
+            cc.width=w; cc.height=h;
+            ctx.drawImage(chart.canvas,0,0,w,h);
+          });
+        }
+      });
       hideEls.forEach((e,i)=>e.style.display=origDisplays[i]);
       return c;
     }
@@ -1258,7 +1262,19 @@ async function downloadPDF(panelId, sectionTitle){
 
     } else {
       // Other panels: single capture
-      const canvas = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false});
+      const canvas = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false,
+        onclone:(clonedDoc)=>{
+          Object.values(CC).forEach(chart=>{
+            if(!chart||!chart.canvas.id) return;
+            const cc=clonedDoc.getElementById(chart.canvas.id);
+            if(!cc) return;
+            const ctx=cc.getContext('2d');
+            const w=chart.canvas.offsetWidth*4, h=chart.canvas.offsetHeight*4;
+            cc.width=w; cc.height=h;
+            ctx.drawImage(chart.canvas,0,0,w,h);
+          });
+        }
+      });
 
       contentEl.style.overflow=origContentOverflow;contentEl.style.height=origContentHeight;
       panel.style.height=origPanelHeight;panel.style.overflow=origPanelOverflow;
@@ -1267,13 +1283,6 @@ async function downloadPDF(panelId, sectionTitle){
       await new Promise(r=>setTimeout(r,40));
       addCanvasToPDF(canvas);
     }
-
-    // Restore chart pixel ratios
-    Object.entries(CC).forEach(([id, chart]) => {
-      if (!chart || origDPRs[id] == null) return;
-      chart.options.devicePixelRatio = origDPRs[id];
-      chart.resize();
-    });
 
     // Add footer on last page
     pdf.setFontSize(7);
