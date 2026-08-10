@@ -1226,7 +1226,7 @@ async function loadData(){
   }
   try{
     if(sub) sub.textContent='Fetching latest data from Google Sheets…';
-    const res=await fetch(DATA_URL+'&t='+Date.now());
+    const res=await fetch(DATA_URL+'?t='+Date.now());
     if(!res.ok) throw new Error('HTTP '+res.status);
     const d=await res.json();
     RAW_ORGANIC=Array.isArray(d.organic)?d.organic:[];
