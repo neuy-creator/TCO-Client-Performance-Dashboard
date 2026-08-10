@@ -4,9 +4,9 @@
 // STEP 1: Set your sheet names below (must match exactly)
 // ============================================================
 
-const SHEET_ORGANIC = 'Monthly Performance';   // ← organic/monthly data
-const SHEET_CONTENT = 'Top Posts';             // ← top posts (content breakdown)
-const SHEET_SUMMARY = 'Brand Summary';         // ← brand summary totals
+const SHEET_ORGANIC = 'Brand Data (Industry) - Organic';             // ← organic/monthly data
+const SHEET_CONTENT = 'Brand Data (Industry) - Content Performance'; // ← top posts (content breakdown)
+const SHEET_SUMMARY = 'Brand Summary - Organic';                      // ← brand summary totals
 
 // ============================================================
 // DO NOT EDIT BELOW THIS LINE
