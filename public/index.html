@@ -1167,11 +1167,11 @@ async function downloadPDF(panelId, sectionTitle){
     sub.textContent = 'Rendering charts…';
     await new Promise(r => setTimeout(r, 80));
 
-    // A4 landscape — 281mm content ≈ 1060px at 96dpi = same scale as on screen
-    const PAGE_W = 297, PAGE_H = 210, MARGIN = 8;
+    // A4 portrait — capture narrow so content fills page at readable size
+    const PAGE_W = 210, PAGE_H = 297, MARGIN = 8;
     const contentW = PAGE_W - MARGIN * 2;
     const contentH = PAGE_H - MARGIN * 2;
-    const CAPTURE_W = 1060; // 100% — matches screen size 1:1
+    const CAPTURE_W = 600;
     const isDarkNow = document.documentElement.getAttribute('data-theme')==='dark';
     const bgFill = isDarkNow ? '#111111' : '#F0F2F8';
 
@@ -1187,7 +1187,7 @@ async function downloadPDF(panelId, sectionTitle){
 
     // Helper: add all pages from a canvas to pdf
     let pageCount = 0;
-    const pdf = new jsPDF('l','mm','a4');
+    const pdf = new jsPDF('p','mm','a4');
     function addPageHeader(pageNum){
       pdf.setFontSize(8);pdf.setTextColor(150);
       pdf.text('The Chosen One Agency  ·  '+brand+' — '+sectionTitle, MARGIN, MARGIN-3);
