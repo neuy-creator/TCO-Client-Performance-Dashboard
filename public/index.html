@@ -1167,10 +1167,12 @@ async function downloadPDF(panelId, sectionTitle){
     sub.textContent = 'Rendering charts…';
     await new Promise(r => setTimeout(r, 80));
 
-    // A4 dimensions in mm (portrait)
-    const PAGE_W = 210, PAGE_H = 297, MARGIN = 12;
+    // A4 portrait — capture at ~A4 width so text renders at natural size
+    const PAGE_W = 210, PAGE_H = 297, MARGIN = 10;
     const contentW = PAGE_W - MARGIN * 2;
     const contentH = PAGE_H - MARGIN * 2;
+    // 190mm ≈ 718px at 96dpi — capture at this width so PDF text matches screen size
+    const CAPTURE_W = 720;
     const isDarkNow = document.documentElement.getAttribute('data-theme')==='dark';
     const bgFill = isDarkNow ? '#111111' : '#F0F2F8';
 
@@ -1179,7 +1181,7 @@ async function downloadPDF(panelId, sectionTitle){
       const origDisplays=hideEls.map(e=>e.style.display);
       hideEls.forEach(e=>e.style.display='none');
       await new Promise(r=>setTimeout(r,80));
-      const c = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:panel.scrollWidth+48,logging:false});
+      const c = await html2canvas(panel,{scale:2.5,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false});
       hideEls.forEach((e,i)=>e.style.display=origDisplays[i]);
       return c;
     }
@@ -1248,7 +1250,7 @@ async function downloadPDF(panelId, sectionTitle){
 
     } else {
       // Other panels: single capture
-      const canvas = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:panel.scrollWidth+48,logging:false});
+      const canvas = await html2canvas(panel,{scale:2.5,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false});
 
       contentEl.style.overflow=origContentOverflow;contentEl.style.height=origContentHeight;
       panel.style.height=origPanelHeight;panel.style.overflow=origPanelOverflow;
