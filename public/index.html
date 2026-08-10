@@ -1209,7 +1209,7 @@ async function downloadPDF(panelId, sectionTitle){
         ctx.fillStyle=bgFill;ctx.fillRect(0,0,slice.width,slice.height);
         ctx.drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,srcH);
         addPageHeader(pageCount);
-        pdf.addImage(slice.toDataURL('image/jpeg',0.92),'JPEG',MARGIN,MARGIN,contentW,sliceH);
+        pdf.addImage(slice.toDataURL('image/png'),'PNG',MARGIN,MARGIN,contentW,sliceH);
         srcY+=srcPageH;
       }
     }
