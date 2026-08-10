@@ -1,59 +1,183 @@
 // ============================================================
 // TCO CLIENT DASHBOARD — Google Sheets Auto-Sync
-// ============================================================
-// STEP 1: Set your sheet names below (must match exactly)
+// Auto-generated to match actual sheet structure in TCO Data Hub
 // ============================================================
 
-const SHEET_ORGANIC = 'Brand Data (Industry) - Organic';             // ← organic/monthly data
-const SHEET_CONTENT = 'Brand Data (Industry) - Content Performance'; // ← top posts (content breakdown)
-const SHEET_SUMMARY = 'Brand Summary - Organic';                      // ← brand summary totals
+const SHEET_ORGANIC = 'Brand Data (Industry) - Organic';
+const SHEET_SUMMARY = 'Brand Summary - Organic';
 
-// ============================================================
-// DO NOT EDIT BELOW THIS LINE
 // ============================================================
 
 function doGet(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  const data = {
-    organic: readSheet(ss, SHEET_ORGANIC, mapOrganic),
-    content: readSheet(ss, SHEET_CONTENT, mapContent),
-    summary: readSheet(ss, SHEET_SUMMARY, mapSummary)
-  };
+  const { organic, content } = readOrganic(ss);
+  const summary = readSummary(ss);
 
   return ContentService
-    .createTextOutput(JSON.stringify(data))
+    .createTextOutput(JSON.stringify({ organic, content, summary }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ── Sheet reader ─────────────────────────────────────────────
-function readSheet(ss, sheetName, mapFn) {
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) { Logger.log('Sheet not found: ' + sheetName); return []; }
+// ── Organic sheet reader ──────────────────────────────────────
+// Structure:
+//   Row 1: Title row (skip)
+//   Row 2: Platform group headers (skip)
+//   Row 3: Column headers (skip)
+//   Row 4+: Data — industry label rows interspersed with data rows
+//
+// Industry label rows: col A = industry name, col C (Platform) = empty
+// Data rows: col C always has "Facebook" or "Instagram"
+// Month and Brand forward-fill when blank
+
+function readOrganic(ss) {
+  const sheet = ss.getSheetByName(SHEET_ORGANIC);
+  if (!sheet) { Logger.log('Sheet not found: ' + SHEET_ORGANIC); return { organic: [], content: [] }; }
+
   const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
-  const headers = values[0].map(h => String(h).trim().toLowerCase());
-  return values.slice(1)
-    .filter(row => row.some(cell => cell !== '' && cell !== null))
-    .map(row => {
-      const obj = {};
-      headers.forEach((h, i) => { obj[h] = row[i]; });
-      return mapFn(obj);
-    })
-    .filter(Boolean);
+  const organic = [];
+  const content = [];
+
+  let curIndustry = '';
+  let curBrand    = '';
+  let curMonth    = null;
+
+  for (let i = 3; i < values.length; i++) {   // start at row 4 (index 3)
+    const row = values[i];
+
+    // Skip completely empty rows
+    if (row.every(v => v === null || v === '' || v === undefined)) continue;
+
+    const platform = row[2] ? String(row[2]).trim() : null;
+
+    // Industry label rows have no platform value
+    if (!platform) {
+      if (row[0]) curIndustry = String(row[0]).trim().toUpperCase();
+      continue;
+    }
+
+    // Forward-fill month and brand
+    if (row[0] !== null && row[0] !== '') curMonth = fmtMonth(row[0]);
+    if (row[1] !== null && row[1] !== '') curBrand = String(row[1]).replace(/\n/g, ' ').trim();
+
+    if (!curMonth || !curBrand) continue;
+
+    organic.push({
+      month:            curMonth,
+      brand:            curBrand,
+      industry:         curIndustry,
+      platform:         platform,
+      followers:        num(row[3]),
+      reach:            num(row[4]),
+      impressions:      num(row[5]),
+      engagements:      num(row[6]),
+      er_pct:           num(row[7]),
+      top_organic:      str(row[8]),
+      organic_category: str(row[9]),
+      organic_type:     str(row[10]),
+      top_boosted:      str(row[11]),
+      boosted_category: str(row[12]),
+      boosted_type:     str(row[13]),
+      notes:            str(row[14])
+    });
+
+    // Extract organic top post as content row
+    if (row[8] || row[9] || row[10]) {
+      content.push({
+        month:     curMonth,
+        brand:     curBrand,
+        industry:  curIndustry,
+        platform:  platform,
+        type:      'Organic',
+        title:     str(row[8]),
+        link:      null,
+        category:  str(row[9]),
+        post_type: str(row[10]),
+        engagement: null, reach: null, views: null, shares: null, saves: null
+      });
+    }
+
+    // Extract boosted top post as content row
+    if (row[11] || row[12] || row[13]) {
+      content.push({
+        month:     curMonth,
+        brand:     curBrand,
+        industry:  curIndustry,
+        platform:  platform,
+        type:      'Boosted',
+        title:     str(row[11]),
+        link:      null,
+        category:  str(row[12]),
+        post_type: str(row[13]),
+        engagement: null, reach: null, views: null, shares: null, saves: null
+      });
+    }
+  }
+
+  Logger.log('Organic rows: ' + organic.length + ' | Content rows: ' + content.length);
+  return { organic, content };
+}
+
+// ── Brand Summary sheet reader ────────────────────────────────
+// Structure:
+//   Row 1: Platform group headers (skip)
+//   Row 2: Column headers
+//   Row 3+: Data — Industry forward-fills when blank
+
+function readSummary(ss) {
+  const sheet = ss.getSheetByName(SHEET_SUMMARY);
+  if (!sheet) { Logger.log('Sheet not found: ' + SHEET_SUMMARY); return []; }
+
+  const values = sheet.getDataRange().getValues();
+  const summary = [];
+  let curIndustry = '';
+
+  for (let i = 2; i < values.length; i++) {   // start at row 3 (index 2)
+    const row = values[i];
+    if (row.every(v => v === null || v === '' || v === undefined)) continue;
+
+    if (row[0]) curIndustry = String(row[0]).trim().toUpperCase();
+    const brand = str(row[1]);
+    if (!brand) continue;
+
+    summary.push({
+      industry:           curIndustry,
+      brand:              brand,
+      period:             str(row[2]),
+      fb_follower_growth: num(row[3]),
+      fb_total_reach:     num(row[4]),
+      fb_total_eng:       num(row[5]),
+      ig_follower_growth: num(row[6]),
+      ig_reach_growth:    num(row[7]),
+      ig_eng_growth:      num(row[8])
+    });
+  }
+
+  Logger.log('Summary rows: ' + summary.length);
+  return summary;
 }
 
 // ── Helpers ──────────────────────────────────────────────────
-// Find a value by trying multiple possible header names
-function v(obj, ...keys) {
-  for (const k of keys) {
-    const found = Object.keys(obj).find(ok => ok === k.toLowerCase());
-    if (found !== undefined) {
-      const val = obj[found];
-      return (val === '' || val === null) ? null : val;
-    }
+
+function fmtMonth(val) {
+  if (!val) return null;
+  // Date object from Google Sheets
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    return y + '-' + m;
   }
-  return null;
+  const s = String(val).trim();
+  // Already YYYY-MM or YYYY-MM-DD
+  if (/^\d{4}-\d{2}/.test(s)) return s.slice(0, 7);
+  // "Sep 2025" or "September 2025" format
+  const MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6,
+                   jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+  const m = s.match(/^(\w+)\s+(\d{4})$/i);
+  if (m) {
+    const mo = MONTHS[m[1].slice(0,3).toLowerCase()];
+    if (mo) return m[2] + '-' + String(mo).padStart(2, '0');
+  }
+  return s;
 }
 
 function num(val) {
@@ -64,93 +188,19 @@ function num(val) {
 
 function str(val) {
   if (val === null || val === '' || val === undefined) return null;
-  return String(val).trim() || null;
+  const s = String(val).replace(/\n/g, ' ').trim();
+  return s || null;
 }
 
-// Convert Date objects or "2025-01" strings to "YYYY-MM" format
-function fmtMonth(val) {
-  if (!val) return null;
-  if (val instanceof Date) {
-    const y = val.getFullYear();
-    const m = String(val.getMonth() + 1).padStart(2, '0');
-    return y + '-' + m;
-  }
-  const s = String(val).trim();
-  // Already YYYY-MM
-  if (/^\d{4}-\d{2}/.test(s)) return s.slice(0, 7);
-  return s;
-}
-
-// ── Column mappers ───────────────────────────────────────────
-function mapOrganic(row) {
-  const month = fmtMonth(v(row, 'month'));
-  if (!month) return null;
-  return {
-    month,
-    brand:            str(v(row, 'brand')),
-    industry:         str(v(row, 'industry')),
-    platform:         str(v(row, 'platform')),
-    followers:        num(v(row, 'followers')),
-    reach:            num(v(row, 'reach')),
-    impressions:      num(v(row, 'impressions')),
-    engagements:      num(v(row, 'engagements')),
-    er_pct:           num(v(row, 'er%', 'er_pct', 'er', 'engagement rate')),
-    top_organic:      str(v(row, 'top organic', 'top_organic', 'top organic post')),
-    organic_category: str(v(row, 'organic category', 'organic_category')),
-    organic_type:     str(v(row, 'organic type', 'organic_type')),
-    top_boosted:      str(v(row, 'top boosted', 'top_boosted', 'top boosted post')),
-    boosted_category: str(v(row, 'boosted category', 'boosted_category')),
-    boosted_type:     str(v(row, 'boosted type', 'boosted_type')),
-    notes:            str(v(row, 'notes'))
-  };
-}
-
-function mapContent(row) {
-  const month = fmtMonth(v(row, 'month'));
-  if (!month) return null;
-  return {
-    month,
-    brand:      str(v(row, 'brand')),
-    industry:   str(v(row, 'industry')),
-    platform:   str(v(row, 'platform')),
-    type:       str(v(row, 'type')),
-    title:      str(v(row, 'title', 'post title')),
-    link:       str(v(row, 'link', 'url', 'post link', 'post url')),
-    category:   str(v(row, 'category')),
-    post_type:  str(v(row, 'post type', 'post_type', 'format', 'content type')),
-    engagement: num(v(row, 'engagement', 'engagements')),
-    reach:      num(v(row, 'reach')),
-    views:      num(v(row, 'views')),
-    shares:     num(v(row, 'shares')),
-    saves:      num(v(row, 'saves'))
-  };
-}
-
-function mapSummary(row) {
-  const brand = str(v(row, 'brand'));
-  if (!brand) return null;
-  return {
-    industry:           str(v(row, 'industry')),
-    brand,
-    period:             str(v(row, 'period')),
-    fb_follower_growth: num(v(row, 'fb follower growth', 'fb_follower_growth')),
-    fb_total_reach:     num(v(row, 'fb total reach', 'fb_total_reach')),
-    fb_total_eng:       num(v(row, 'fb total engagement', 'fb_total_eng', 'fb total eng')),
-    ig_follower_growth: num(v(row, 'ig follower growth', 'ig_follower_growth')),
-    ig_reach_growth:    num(v(row, 'ig reach growth', 'ig_reach_growth', 'ig total reach')),
-    ig_eng_growth:      num(v(row, 'ig engagement growth', 'ig_eng_growth', 'ig total engagement'))
-  };
-}
-
-// ── Test function (run this in Apps Script to verify) ────────
+// ── Test — run this to verify row counts ─────────────────────
 function testData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const organic = readSheet(ss, SHEET_ORGANIC, mapOrganic);
-  const content = readSheet(ss, SHEET_CONTENT, mapContent);
-  const summary = readSheet(ss, SHEET_SUMMARY, mapSummary);
-  Logger.log('Organic rows: ' + organic.length);
-  Logger.log('Content rows: ' + content.length);
-  Logger.log('Summary rows: ' + summary.length);
-  if (organic.length) Logger.log('First organic row: ' + JSON.stringify(organic[0]));
-  if (content.length) Logger.log('First content row: ' + JSON.stringify(content[0]));
+  const { organic, content } = readOrganic(ss);
+  const summary = readSummary(ss);
+  Logger.log('=== RESULTS ===');
+  Logger.log('Organic: ' + organic.length + ' rows');
+  Logger.log('Content: ' + content.length + ' rows');
+  Logger.log('Summary: ' + summary.length + ' rows');
+  if (organic.length) Logger.log('First organic: ' + JSON.stringify(organic[0]));
+  if (summary.length) Logger.log('First summary: ' + JSON.stringify(summary[0]));
 }
