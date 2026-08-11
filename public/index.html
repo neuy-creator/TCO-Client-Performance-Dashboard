@@ -1377,10 +1377,10 @@ async function downloadAllPDF(){
     bm:['cBmReach','cBmEng','cBmEngER']
   };
   const SECTIONS=[
-    {id:'ov',title:'Overview'},
-    {id:'mo',title:'Monthly Performance'},
-    {id:'cb',title:'Content Breakdown'},
-    {id:'bm',title:'Benchmark'}
+    {id:'ov',title:'Overview',render:renderOV},
+    {id:'mo',title:'Monthly Performance',render:renderMO},
+    {id:'cb',title:'Content Breakdown',render:renderCB},
+    {id:'bm',title:'Benchmark',render:renderBM}
   ];
 
   function hdr(pageNum,title){
@@ -1437,7 +1437,9 @@ async function downloadAllPDF(){
       panel.style.height='auto';panel.style.overflow='visible';
       panel.style.width=A4_W+'px';panel.style.maxWidth=A4_W+'px';
 
-      // Resize + update charts for this panel (update forces re-render for panels that were hidden at init)
+      // Ensure charts are rendered (may be null if panel was never visited)
+      sec.render();
+      // Resize + update to fit the squeezed A4 width
       charts.forEach(id=>{if(CC[id]){CC[id].resize();CC[id].update();}});
       await new Promise(r=>setTimeout(r,350));
 
