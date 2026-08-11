@@ -1200,17 +1200,23 @@ async function downloadPDF(panelId, sectionTitle){
     await new Promise(r => setTimeout(r, 120));
     sub.textContent = 'Rendering charts…';
 
-    await new Promise(r => setTimeout(r, 80));
+    // A4 portrait: squeeze panel to 794px so capture = exactly A4 width
+    const A4_W = 794;
+    const origPanelWidth = panel.style.width;
+    const origPanelMaxWidth = panel.style.maxWidth;
+    panel.style.width = A4_W + 'px';
+    panel.style.maxWidth = A4_W + 'px';
+    Object.values(CC).forEach(ch=>ch&&ch.resize());
+    await new Promise(r => setTimeout(r, 200));
 
-    // A4 portrait — fixed 1100px capture matches original Jul 22 output scale
     const PAGE_W = 210, PAGE_H = 297, MARGIN = 12;
     const contentW = PAGE_W - MARGIN * 2;
     const contentH = PAGE_H - MARGIN * 2;
-    const CAPTURE_W = 1100;
+    const CAPTURE_W = A4_W;
     const isDarkNow = document.documentElement.getAttribute('data-theme')==='dark';
     const bgFill = isDarkNow ? '#111111' : '#F0F2F8';
 
-    // Helper: capture a canvas of the panel with some elements hidden (display:none so layout collapses)
+    // Helper: capture a canvas of the panel with some elements hidden
     async function capturePanel(hideEls){
       const origDisplays=hideEls.map(e=>e.style.display);
       hideEls.forEach(e=>e.style.display='none');
@@ -1267,18 +1273,15 @@ async function downloadPDF(panelId, sectionTitle){
       const pdfBtnEl=document.getElementById('pdf-btn-'+panelId);
       if(pdfBtnEl&&!part1HideEls.includes(pdfBtnEl)) part1HideEls.push(pdfBtnEl);
 
-      // Boost chart fonts for PDF legibility
-      _boostChartFonts();
-      await new Promise(r=>setTimeout(r,180));
-
       sub.textContent='Capturing Monthly Performance…';
       const canvas1=await capturePanel(part2Els);
 
       sub.textContent='Capturing Content Breakdown…';
       const canvas2=await capturePanel(part1HideEls);
 
-      // Restore chart fonts and layout
-      _restoreChartFonts();
+      // Restore panel width, charts, and layout
+      panel.style.width=origPanelWidth; panel.style.maxWidth=origPanelMaxWidth;
+      Object.values(CC).forEach(ch=>ch&&ch.resize());
       contentEl.style.overflow=origContentOverflow;contentEl.style.height=origContentHeight;
       panel.style.height=origPanelHeight;panel.style.overflow=origPanelOverflow;
 
@@ -1289,14 +1292,11 @@ async function downloadPDF(panelId, sectionTitle){
 
     } else {
       // Other panels: single capture
-      // Boost chart fonts for PDF legibility
-      _boostChartFonts();
-      await new Promise(r=>setTimeout(r,180));
-
       const canvas = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false});
 
-      // Restore chart fonts and layout
-      _restoreChartFonts();
+      // Restore panel width, charts, and layout
+      panel.style.width=origPanelWidth; panel.style.maxWidth=origPanelMaxWidth;
+      Object.values(CC).forEach(ch=>ch&&ch.resize());
       contentEl.style.overflow=origContentOverflow;contentEl.style.height=origContentHeight;
       panel.style.height=origPanelHeight;panel.style.overflow=origPanelOverflow;
 
