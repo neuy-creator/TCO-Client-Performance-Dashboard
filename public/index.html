@@ -1421,19 +1421,32 @@ async function downloadAllPDF(){
   const origActivePanel=document.querySelector('.panel.active');
   const origActivePanelId=origActivePanel?origActivePanel.id.replace('panel-',''):'ov';
 
+  // Disable animations so charts draw instantly when panels are rendered
+  Chart.defaults.animation=false;
+
   try{
     const contentEl=document.querySelector('.content');
     for(const sec of SECTIONS){
       sub.textContent='Capturing '+sec.title+'…';
 
-      // Navigate to this panel — same as clicking the tab, guarantees charts are rendered
-      showPanel(sec.id);
-      await new Promise(r=>setTimeout(r,500));
+      // Step 1: make panel visible (CSS only, no render yet)
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+      document.getElementById('panel-'+sec.id).classList.add('active');
+      const tabEl=document.getElementById('tab-'+sec.id);
+      if(tabEl)tabEl.classList.add('active');
+
+      // Step 2: wait for browser to layout the now-visible panel (so canvases have real dimensions)
+      await new Promise(r=>setTimeout(r,80));
+
+      // Step 3: render charts now that panel has correct dimensions
+      sec.render();
+      await new Promise(r=>setTimeout(r,200));
 
       const panel=document.getElementById('panel-'+sec.id);
       const charts=PANEL_CHARTS[sec.id];
 
-      // Squeeze to A4 width
+      // Step 4: squeeze to A4 width and force resize
       const oco=contentEl.style.overflow,och=contentEl.style.height;
       const oph=panel.style.height,opo=panel.style.overflow;
       const opw=panel.style.width,opmw=panel.style.maxWidth;
@@ -1441,7 +1454,7 @@ async function downloadAllPDF(){
       panel.style.height='auto';panel.style.overflow='visible';
       panel.style.width=A4_W+'px';panel.style.maxWidth=A4_W+'px';
       charts.forEach(id=>{if(CC[id]){CC[id].resize();CC[id].update('none');}});
-      await new Promise(r=>setTimeout(r,150));
+      await new Promise(r=>setTimeout(r,100));
 
       // Hide PDF buttons during capture
       const pdfBtns=[...panel.querySelectorAll('.pdf-btn')];
@@ -1480,7 +1493,8 @@ async function downloadAllPDF(){
     sub.textContent='Error: '+err.message;
     await new Promise(r=>setTimeout(r,2000));
   }finally{
-    // Restore the panel the user was on
+    // Restore animations and the panel the user was on
+    Chart.defaults.animation={duration:1000};
     showPanel(origActivePanelId);
     overlay.classList.remove('show');
     btn.disabled=false;
