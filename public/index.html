@@ -445,6 +445,7 @@ let RAW_SUMMARY = [];
 
 // ── STATE ─────────────────────────────────────────────────────
 let brand='', periodFrom='all', periodTo='all', CC={}, postTypeFilter='all';
+let _PDF_FONT_SCALE=1;
 
 // ── HELPERS ───────────────────────────────────────────────────
 const sum  = a=>a.filter(v=>v!=null&&!isNaN(v)).reduce((x,y)=>x+y,0);
@@ -500,7 +501,7 @@ const barLabelPlugin={
         const label=(chart.options._barLabelNoPrefix?'':val>0?'+':'')+fmt(val);
         ctx.save();
         ctx.fillStyle=isDark?'rgba(255,255,255,.85)':'rgba(20,20,40,.8)';
-        ctx.font='bold 10px system-ui,sans-serif';
+        ctx.font=`bold ${Math.round(10*_PDF_FONT_SCALE)}px system-ui,sans-serif`;
         ctx.textAlign='center';ctx.textBaseline='bottom';
         ctx.fillText(label,bar.x,bar.y-3);
         ctx.restore();
@@ -1138,6 +1139,29 @@ function generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGE
 }
 
 // ── PDF DOWNLOAD ──────────────────────────────────────────────
+function _boostChartFonts(){
+  _PDF_FONT_SCALE=1.5;
+  Object.values(CC).forEach(chart=>{
+    if(!chart) return;
+    if(chart.options.plugins?.legend?.labels?.font) chart.options.plugins.legend.labels.font.size=16;
+    if(chart.options.scales) Object.values(chart.options.scales).forEach(s=>{
+      if(s?.ticks?.font) s.ticks.font.size=14;
+    });
+    chart.update('none');
+  });
+}
+function _restoreChartFonts(){
+  _PDF_FONT_SCALE=1;
+  Object.values(CC).forEach(chart=>{
+    if(!chart) return;
+    if(chart.options.plugins?.legend?.labels?.font) chart.options.plugins.legend.labels.font.size=11;
+    if(chart.options.scales) Object.values(chart.options.scales).forEach(s=>{
+      if(s?.ticks?.font) s.ticks.font.size=10;
+    });
+    chart.update('none');
+  });
+}
+
 async function downloadPDF(panelId, sectionTitle){
   const {jsPDF} = window.jspdf;
   const overlay = document.getElementById('pdfOverlay');
@@ -1181,19 +1205,7 @@ async function downloadPDF(panelId, sectionTitle){
       const origDisplays=hideEls.map(e=>e.style.display);
       hideEls.forEach(e=>e.style.display='none');
       await new Promise(r=>setTimeout(r,80));
-      const c = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false,
-        onclone:(clonedDoc)=>{
-          Object.values(CC).forEach(chart=>{
-            if(!chart||!chart.canvas.id) return;
-            const cc=clonedDoc.getElementById(chart.canvas.id);
-            if(!cc) return;
-            const ctx=cc.getContext('2d');
-            const w=chart.canvas.offsetWidth*4, h=chart.canvas.offsetHeight*4;
-            cc.width=w; cc.height=h;
-            ctx.drawImage(chart.canvas,0,0,w,h);
-          });
-        }
-      });
+      const c = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false});
       hideEls.forEach((e,i)=>e.style.display=origDisplays[i]);
       return c;
     }
@@ -1245,13 +1257,18 @@ async function downloadPDF(panelId, sectionTitle){
       const pdfBtnEl=document.getElementById('pdf-btn-'+panelId);
       if(pdfBtnEl&&!part1HideEls.includes(pdfBtnEl)) part1HideEls.push(pdfBtnEl);
 
+      // Boost chart fonts for PDF legibility
+      _boostChartFonts();
+      await new Promise(r=>setTimeout(r,180));
+
       sub.textContent='Capturing Monthly Performance…';
       const canvas1=await capturePanel(part2Els);
 
       sub.textContent='Capturing Content Breakdown…';
       const canvas2=await capturePanel(part1HideEls);
 
-      // Restore layout
+      // Restore chart fonts and layout
+      _restoreChartFonts();
       contentEl.style.overflow=origContentOverflow;contentEl.style.height=origContentHeight;
       panel.style.height=origPanelHeight;panel.style.overflow=origPanelOverflow;
 
@@ -1262,20 +1279,14 @@ async function downloadPDF(panelId, sectionTitle){
 
     } else {
       // Other panels: single capture
-      const canvas = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false,
-        onclone:(clonedDoc)=>{
-          Object.values(CC).forEach(chart=>{
-            if(!chart||!chart.canvas.id) return;
-            const cc=clonedDoc.getElementById(chart.canvas.id);
-            if(!cc) return;
-            const ctx=cc.getContext('2d');
-            const w=chart.canvas.offsetWidth*4, h=chart.canvas.offsetHeight*4;
-            cc.width=w; cc.height=h;
-            ctx.drawImage(chart.canvas,0,0,w,h);
-          });
-        }
-      });
+      // Boost chart fonts for PDF legibility
+      _boostChartFonts();
+      await new Promise(r=>setTimeout(r,180));
 
+      const canvas = await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:CAPTURE_W,logging:false});
+
+      // Restore chart fonts and layout
+      _restoreChartFonts();
       contentEl.style.overflow=origContentOverflow;contentEl.style.height=origContentHeight;
       panel.style.height=origPanelHeight;panel.style.overflow=origPanelOverflow;
 
