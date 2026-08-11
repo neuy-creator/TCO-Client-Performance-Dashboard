@@ -205,6 +205,10 @@ tr:hover td{background:rgba(118,92,255,.04)}
     <span class="tb-logo">The Chosen One</span>
     <span class="tb-sep">·</span>
     <span class="tb-title" id="tbTitle">Social Media Performance</span>
+    <button class="pdf-btn" id="export-all-btn" onclick="downloadAllPDF()" style="margin-right:8px">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8m0 0L5 7m3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
+      Export All
+    </button>
     <div class="sw-wrap" onclick="toggleTheme()">
       <div class="sw-track on" id="swTrack"></div>
       <span class="sw-lbl" id="swLbl">Dark Mode</span>
@@ -1350,6 +1354,135 @@ async function loadData(){
   init();
 }
 loadData();
+
+async function downloadAllPDF(){
+  const {jsPDF}=window.jspdf;
+  const overlay=document.getElementById('pdfOverlay');
+  const sub=document.getElementById('pdfModalSub');
+  const btn=document.getElementById('export-all-btn');
+  overlay.classList.add('show');
+  btn.disabled=true;
+
+  const A4_W=794, PAGE_W=210, PAGE_H=297, MARGIN=12;
+  const contentW=PAGE_W-MARGIN*2, contentH=PAGE_H-MARGIN*2;
+  const isDarkNow=document.documentElement.getAttribute('data-theme')==='dark';
+  const bgFill=isDarkNow?'#111111':'#F0F2F8';
+  const pdf=new jsPDF('p','mm','a4');
+  let pageCount=0;
+
+  const PANEL_CHARTS={
+    ov:['cReach','cER','cFoll'],
+    mo:['cFBMo','cIGMo','cEngSplit','cOvB'],
+    cb:['cCatEng_org','cCatEng_boost'],
+    bm:['cBmReach','cBmEng','cBmEngER']
+  };
+  const SECTIONS=[
+    {id:'ov',title:'Overview'},
+    {id:'mo',title:'Monthly Performance'},
+    {id:'cb',title:'Content Breakdown'},
+    {id:'bm',title:'Benchmark'}
+  ];
+
+  function hdr(pageNum,title){
+    pdf.setFontSize(8);pdf.setTextColor(150);
+    pdf.text('The Chosen One Agency  ·  '+brand+' — '+title,MARGIN,MARGIN-3);
+    pdf.text('Page '+pageNum,PAGE_W-MARGIN,MARGIN-3,{align:'right'});
+    pdf.setTextColor(30);
+  }
+  function addCanvas(canvas,title){
+    const imgH=(canvas.height/canvas.width)*contentW;
+    const srcPageH=(contentH/imgH)*canvas.height;
+    let srcY=0;
+    while(srcY<canvas.height){
+      if(pageCount>0)pdf.addPage();
+      pageCount++;
+      const srcH=Math.min(srcPageH,canvas.height-srcY);
+      const sliceH=(srcH/canvas.height)*imgH;
+      const sl=document.createElement('canvas');
+      sl.width=canvas.width;sl.height=srcH;
+      const ctx=sl.getContext('2d');
+      ctx.fillStyle=bgFill;ctx.fillRect(0,0,sl.width,sl.height);
+      ctx.drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,srcH);
+      hdr(pageCount,title);
+      pdf.addImage(sl.toDataURL('image/png'),'PNG',MARGIN,MARGIN,contentW,sliceH);
+      srcY+=srcPageH;
+    }
+  }
+  async function snap(panel,hideEls=[]){
+    const od=hideEls.map(e=>e.style.display);
+    hideEls.forEach(e=>e.style.display='none');
+    await new Promise(r=>setTimeout(r,80));
+    const c=await html2canvas(panel,{scale:2,useCORS:true,allowTaint:true,scrollX:0,scrollY:0,windowWidth:A4_W,logging:false});
+    hideEls.forEach((e,i)=>e.style.display=od[i]);
+    return c;
+  }
+
+  try{
+    const contentEl=document.querySelector('.content');
+    for(const sec of SECTIONS){
+      sub.textContent='Capturing '+sec.title+'…';
+      const panel=document.getElementById('panel-'+sec.id);
+      const charts=PANEL_CHARTS[sec.id];
+
+      // Temporarily show if hidden
+      const wasHidden=panel.style.display==='none'||!panel.classList.contains('active');
+      const origDisplay=panel.style.display;
+      if(wasHidden) panel.style.display='block';
+
+      // Unconstrain
+      const oco=contentEl.style.overflow,och=contentEl.style.height;
+      const oph=panel.style.height,opo=panel.style.overflow;
+      const opw=panel.style.width,opmw=panel.style.maxWidth;
+      contentEl.style.overflow='visible';contentEl.style.height='auto';
+      panel.style.height='auto';panel.style.overflow='visible';
+      panel.style.width=A4_W+'px';panel.style.maxWidth=A4_W+'px';
+
+      // Resize charts for this panel
+      charts.forEach(id=>{if(CC[id])CC[id].resize();});
+      await new Promise(r=>setTimeout(r,220));
+
+      // Hide PDF buttons in this panel during capture
+      const pdfBtns=[...panel.querySelectorAll('.pdf-btn')];
+
+      if(sec.id==='mo'){
+        const breakEl=document.getElementById('pdf-break-mo');
+        const part2=[],part1=[];
+        let el=breakEl;
+        while(el){part2.push(el);el=el.nextElementSibling;}
+        el=panel.firstElementChild;
+        while(el&&el!==breakEl){if(!el.classList.contains('sec-hdr'))part1.push(el);el=el.nextElementSibling;}
+        [...pdfBtns].forEach(b=>{if(!part1.includes(b))part1.push(b);});
+        addCanvas(await snap(panel,part2),sec.title);
+        addCanvas(await snap(panel,part1),sec.title);
+      } else {
+        addCanvas(await snap(panel,pdfBtns),sec.title);
+      }
+
+      // Restore
+      panel.style.width=opw;panel.style.maxWidth=opmw;
+      if(wasHidden)panel.style.display=origDisplay;
+      contentEl.style.overflow=oco;contentEl.style.height=och;
+      panel.style.height=oph;panel.style.overflow=opo;
+      charts.forEach(id=>{if(CC[id])CC[id].resize();});
+    }
+
+    // Footer
+    pdf.setFontSize(7);pdf.setTextColor(120);
+    const now=new Date();
+    pdf.text('Generated by TCO Data Hub  ·  '+now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),PAGE_W/2,PAGE_H-5,{align:'center'});
+
+    sub.textContent='Saving…';
+    pdf.save((brand||'report').replace(/\s+/g,'-')+'-full-report.pdf');
+
+  }catch(err){
+    console.error('Export All error:',err);
+    sub.textContent='Error: '+err.message;
+    await new Promise(r=>setTimeout(r,2000));
+  }finally{
+    overlay.classList.remove('show');
+    btn.disabled=false;
+  }
+}
 </script>
 </body>
 </html>
