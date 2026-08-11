@@ -1417,33 +1417,33 @@ async function downloadAllPDF(){
     return c;
   }
 
+  // Remember which panel is currently active so we can restore it
+  const origActivePanel=document.querySelector('.panel.active');
+  const origActivePanelId=origActivePanel?origActivePanel.id.replace('panel-',''):'ov';
+
   try{
     const contentEl=document.querySelector('.content');
     for(const sec of SECTIONS){
       sub.textContent='Capturing '+sec.title+'…';
+
+      // Navigate to this panel — same as clicking the tab, guarantees charts are rendered
+      showPanel(sec.id);
+      await new Promise(r=>setTimeout(r,500));
+
       const panel=document.getElementById('panel-'+sec.id);
       const charts=PANEL_CHARTS[sec.id];
 
-      // Temporarily show if hidden
-      const wasHidden=panel.style.display==='none'||!panel.classList.contains('active');
-      const origDisplay=panel.style.display;
-      if(wasHidden) panel.style.display='block';
-
-      // Unconstrain
+      // Squeeze to A4 width
       const oco=contentEl.style.overflow,och=contentEl.style.height;
       const oph=panel.style.height,opo=panel.style.overflow;
       const opw=panel.style.width,opmw=panel.style.maxWidth;
       contentEl.style.overflow='visible';contentEl.style.height='auto';
       panel.style.height='auto';panel.style.overflow='visible';
       panel.style.width=A4_W+'px';panel.style.maxWidth=A4_W+'px';
+      charts.forEach(id=>{if(CC[id]){CC[id].resize();CC[id].update('none');}});
+      await new Promise(r=>setTimeout(r,150));
 
-      // Ensure charts are rendered (may be null if panel was never visited)
-      sec.render();
-      // Resize + update to fit the squeezed A4 width
-      charts.forEach(id=>{if(CC[id]){CC[id].resize();CC[id].update();}});
-      await new Promise(r=>setTimeout(r,350));
-
-      // Hide PDF buttons in this panel during capture
+      // Hide PDF buttons during capture
       const pdfBtns=[...panel.querySelectorAll('.pdf-btn')];
 
       if(sec.id==='mo'){
@@ -1460,12 +1460,11 @@ async function downloadAllPDF(){
         addCanvas(await snap(panel,pdfBtns),sec.title);
       }
 
-      // Restore
+      // Restore panel size
       panel.style.width=opw;panel.style.maxWidth=opmw;
-      if(wasHidden)panel.style.display=origDisplay;
       contentEl.style.overflow=oco;contentEl.style.height=och;
       panel.style.height=oph;panel.style.overflow=opo;
-      charts.forEach(id=>{if(CC[id]){CC[id].resize();CC[id].update();}});
+      charts.forEach(id=>{if(CC[id]){CC[id].resize();CC[id].update('none');}});
     }
 
     // Footer
@@ -1481,6 +1480,8 @@ async function downloadAllPDF(){
     sub.textContent='Error: '+err.message;
     await new Promise(r=>setTimeout(r,2000));
   }finally{
+    // Restore the panel the user was on
+    showPanel(origActivePanelId);
     overlay.classList.remove('show');
     btn.disabled=false;
   }
