@@ -1140,24 +1140,34 @@ function generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGE
 
 // ── PDF DOWNLOAD ──────────────────────────────────────────────
 function _boostChartFonts(){
-  _PDF_FONT_SCALE=1.5;
+  _PDF_FONT_SCALE=1.4;
+  // Expand each chart container so larger fonts don't squeeze the plot area
+  document.querySelectorAll('.cw').forEach(el=>{
+    el._pdfOrigH=el.style.height;
+    el.style.height=(el.offsetHeight+55)+'px';
+  });
   Object.values(CC).forEach(chart=>{
     if(!chart) return;
-    if(chart.options.plugins?.legend?.labels?.font) chart.options.plugins.legend.labels.font.size=16;
+    if(chart.options.plugins?.legend?.labels?.font) chart.options.plugins.legend.labels.font.size=13;
     if(chart.options.scales) Object.values(chart.options.scales).forEach(s=>{
-      if(s?.ticks?.font) s.ticks.font.size=14;
+      if(s?.ticks?.font) s.ticks.font.size=12;
     });
+    chart.resize();
     chart.update('none');
   });
 }
 function _restoreChartFonts(){
   _PDF_FONT_SCALE=1;
+  document.querySelectorAll('.cw').forEach(el=>{
+    if(el._pdfOrigH!==undefined){el.style.height=el._pdfOrigH;delete el._pdfOrigH;}
+  });
   Object.values(CC).forEach(chart=>{
     if(!chart) return;
     if(chart.options.plugins?.legend?.labels?.font) chart.options.plugins.legend.labels.font.size=11;
     if(chart.options.scales) Object.values(chart.options.scales).forEach(s=>{
       if(s?.ticks?.font) s.ticks.font.size=10;
     });
+    chart.resize();
     chart.update('none');
   });
 }
