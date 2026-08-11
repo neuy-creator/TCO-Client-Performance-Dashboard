@@ -1437,9 +1437,9 @@ async function downloadAllPDF(){
       panel.style.height='auto';panel.style.overflow='visible';
       panel.style.width=A4_W+'px';panel.style.maxWidth=A4_W+'px';
 
-      // Resize charts for this panel
-      charts.forEach(id=>{if(CC[id])CC[id].resize();});
-      await new Promise(r=>setTimeout(r,220));
+      // Resize + update charts for this panel (update forces re-render for panels that were hidden at init)
+      charts.forEach(id=>{if(CC[id]){CC[id].resize();CC[id].update();}});
+      await new Promise(r=>setTimeout(r,350));
 
       // Hide PDF buttons in this panel during capture
       const pdfBtns=[...panel.querySelectorAll('.pdf-btn')];
@@ -1463,7 +1463,7 @@ async function downloadAllPDF(){
       if(wasHidden)panel.style.display=origDisplay;
       contentEl.style.overflow=oco;contentEl.style.height=och;
       panel.style.height=oph;panel.style.overflow=opo;
-      charts.forEach(id=>{if(CC[id])CC[id].resize();});
+      charts.forEach(id=>{if(CC[id]){CC[id].resize();CC[id].update();}});
     }
 
     // Footer
