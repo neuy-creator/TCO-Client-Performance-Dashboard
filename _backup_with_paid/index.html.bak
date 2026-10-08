@@ -33,7 +33,6 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .sb-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin-bottom:6px}
 .sel{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;font-size:12px;cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
 .sel:focus{border-color:var(--purple)}
-.sel:disabled{cursor:default;background-image:none;opacity:.85}
 .sel optgroup{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
 .sel optgroup option{font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text)}
 .brand-card{margin:0 14px 8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
@@ -183,7 +182,6 @@ tr:hover td{background:rgba(118,92,255,.04)}
     <div class="bc-name" id="bcName">—</div>
     <span class="bc-ind" id="bcInd">—</span>
     <div class="bc-per" id="bcPer">—</div>
-    <div class="bc-per" id="bcLock" style="display:none;color:var(--purple);font-weight:700;margin-top:4px">🔒 Client view — link fixed to this brand</div>
   </div>
   <div class="sb-block">
     <div class="sb-lbl">Period</div>
@@ -199,6 +197,7 @@ tr:hover td{background:rgba(118,92,255,.04)}
   <button class="nav-btn"        id="tab-mo" onclick="showPanel('mo')"><span class="nav-ic">📅</span>Monthly Trends</button>
   <button class="nav-btn"        id="tab-cb" onclick="showPanel('cb')"><span class="nav-ic">📋</span>Content Breakdown</button>
   <button class="nav-btn"        id="tab-bm" onclick="showPanel('bm')"><span class="nav-ic">🏆</span>Benchmark</button>
+  <button class="nav-btn"        id="tab-pm" onclick="showPanel('pm')"><span class="nav-ic">💰</span>Paid Media</button>
 </div>
 
 <!-- MAIN -->
@@ -418,6 +417,51 @@ tr:hover td{background:rgba(118,92,255,.04)}
       <div id="insightsContent"></div>
     </div>
 
+    <!-- ══ PAID MEDIA ══ -->
+    <div class="panel" id="panel-pm">
+      <div class="sec-hdr">
+        <div class="sec-row">
+          <div class="sec-title">Paid Media Performance</div>
+          <div class="sec-badge" id="pm-b">All Brands · All Months</div>
+        </div>
+        <p class="sec-desc">Monthly paid media performance across all TCO-managed brands. Data from Meta Ads Manager exports (TCO__Paid_Media_Tracking_Sheet).</p>
+      </div>
+      <div class="filter-row" style="margin-bottom:14px">
+        <span class="fb-lbl">Brand:</span>
+        <select class="sel" id="pmBrandSel" onchange="onPMBrandChange()" style="width:200px;display:inline-block"></select>
+        <span class="fb-lbl" style="margin-left:12px">Month:</span>
+        <select class="sel" id="pmMonthSel" onchange="renderPM()" style="width:130px;display:inline-block"></select>
+      </div>
+      <div id="pm-kpi-row" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px"></div>
+      <div class="chart-row c-2">
+        <div class="chart-box">
+          <div class="ct">Monthly Spend ฿</div>
+          <div class="cs">Total paid media spend by month</div>
+          <div class="cw" style="height:200px"><canvas id="cPMSpend"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <div class="ct">Campaign Type Breakdown</div>
+          <div class="cs">Spend share by campaign objective</div>
+          <div class="cw" style="height:200px"><canvas id="cPMCampaign"></canvas></div>
+        </div>
+      </div>
+      <div class="chart-row c-2">
+        <div class="chart-box">
+          <div class="ct">Cost per Result ฿ — Trend</div>
+          <div class="cs">Average CPR across campaigns by month</div>
+          <div class="cw" style="height:200px"><canvas id="cPMCpr"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <div class="ct">CPM ฿ — Trend</div>
+          <div class="cs">Cost per 1,000 impressions by month</div>
+          <div class="cw" style="height:200px"><canvas id="cPMCpm"></canvas></div>
+        </div>
+      </div>
+      <hr class="sec-div">
+      <div class="sub-hdr">Monthly Detail</div>
+      <div class="tbl-wrap" id="pmTable"></div>
+    </div>
+
   </div>
 </div>
 </div>
@@ -453,7 +497,6 @@ let RAW_PAID    = [];
 // ── STATE ─────────────────────────────────────────────────────
 let brand='', periodFrom='all', periodTo='all', CC={}, postTypeFilter='all';
 let paidBrand='all';
-let LOCKED_BRAND=null;
 let _PDF_FONT_SCALE=1;
 
 // ── HELPERS ───────────────────────────────────────────────────
@@ -476,17 +519,9 @@ function getMonths(b){return[...new Set(RAW_ORGANIC.filter(r=>r.brand===b).map(r
 // e.g. "Erawan  Bangkok" matches "Erawan Bangkok", "Tasabiang" matches "Tasabiang Restaurant"
 function matchContent(brand){
   const norm=s=>s.toLowerCase().replace(/\s+/g,' ').replace(/\s*\(.*?\)\s*/g,'').trim();
-  const flat=s=>s.toLowerCase().replace(/\s+/g,' ').trim();
-  const bl=norm(brand), bf=flat(brand);
-  // Content rows whose brand is itself a different tracked brand (e.g. "Reference (Ekkamai)" vs
-  // "Reference Sathorn - Wongwianyai") must never be mixed in via the loose prefix match.
-  const otherBrands=new Set(RAW_ORGANIC.map(r=>flat(r.brand)));
-  otherBrands.delete(bf);
+  const bl=norm(brand);
   return RAW_CONTENT.filter(r=>{
     if(r.brand===brand)return true;
-    const rf=flat(r.brand);
-    if(rf===bf)return true;
-    if(otherBrands.has(rf))return false;
     const rl=norm(r.brand);
     return rl===bl||rl.startsWith(bl)||bl.startsWith(rl);
   });
@@ -501,13 +536,6 @@ function filterPd(months){
 }
 function dc(id){if(CC[id]){CC[id].destroy();delete CC[id];}}
 const tickC=()=>document.documentElement.getAttribute('data-theme')==='dark'?'#666':'#9CA3AF';
-// Reads ?brand=NAME from the URL for client-locked share links (case/space-insensitive match)
-function getURLBrandParam(){
-  try{
-    const v=new URLSearchParams(location.search).get('brand');
-    return v?v.trim():null;
-  }catch(e){return null;}
-}
 
 // ── BAR LABEL PLUGIN ─────────────────────────────────────────
 const barLabelPlugin={
@@ -566,58 +594,32 @@ function mxo(base,extra){
 // ── INIT ──────────────────────────────────────────────────────
 function init(){
   const allBrands=[...new Set(RAW_ORGANIC.map(r=>r.brand))].sort();
+  // Determine the most recent month across all data
+  const latestMonth=[...new Set(RAW_ORGANIC.map(r=>r.month))].sort().reverse()[0];
+  const brandsInLatest=new Set(RAW_ORGANIC.filter(r=>r.month===latestMonth).map(r=>r.brand));
+  const ongoing=allBrands.filter(b=>brandsInLatest.has(b));
+  const expired=allBrands.filter(b=>!brandsInLatest.has(b));
   const sel=document.getElementById('brandSelect');
-
-  // ── CLIENT-LOCKED SHARE LINK (?brand=NAME) ──────────────────
-  const urlBrandRaw=getURLBrandParam();
-  let lockedBrand=null;
-  if(urlBrandRaw){
-    const norm=s=>s.toLowerCase().trim();
-    lockedBrand=allBrands.find(b=>norm(b)===norm(urlBrandRaw))||null;
+  // Ongoing group
+  const grpOn=document.createElement('optgroup');grpOn.label='● Ongoing';
+  ongoing.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;grpOn.appendChild(o);});
+  sel.appendChild(grpOn);
+  // Expired group
+  if(expired.length){
+    const grpEx=document.createElement('optgroup');grpEx.label='○ Expired';
+    expired.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;grpEx.appendChild(o);});
+    sel.appendChild(grpEx);
   }
-
-  if(lockedBrand){
-    LOCKED_BRAND=lockedBrand;
-    const o=document.createElement('option');o.value=lockedBrand;o.textContent=lockedBrand;
-    sel.appendChild(o);
-    sel.value=lockedBrand;
-    sel.disabled=true;
-    brand=lockedBrand;
-  }else{
-    // Determine the most recent month across all data
-    const latestMonth=[...new Set(RAW_ORGANIC.map(r=>r.month))].sort().reverse()[0];
-    const brandsInLatest=new Set(RAW_ORGANIC.filter(r=>r.month===latestMonth).map(r=>r.brand));
-    const ongoing=allBrands.filter(b=>brandsInLatest.has(b));
-    const expired=allBrands.filter(b=>!brandsInLatest.has(b));
-    // Ongoing group
-    const grpOn=document.createElement('optgroup');grpOn.label='● Ongoing';
-    ongoing.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;grpOn.appendChild(o);});
-    sel.appendChild(grpOn);
-    // Expired group
-    if(expired.length){
-      const grpEx=document.createElement('optgroup');grpEx.label='○ Expired';
-      expired.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;grpEx.appendChild(o);});
-      sel.appendChild(grpEx);
-    }
-    brand=ongoing[0]||allBrands[0];sel.value=brand;
-  }
+  brand=ongoing[0]||allBrands[0];sel.value=brand;
   buildPeriodSelect();updateCard();
 
   // Populate paid brand selector
+  const paidBrands=['all',...new Set(RAW_PAID.map(r=>r.brand).filter(Boolean))].sort((a,b)=>a==='all'?-1:b==='all'?1:a.localeCompare(b));
   const pmSel=document.getElementById('pmBrandSel');
   if(pmSel){
     pmSel.innerHTML='';
-    if(lockedBrand){
-      const o=document.createElement('option');o.value=lockedBrand;o.textContent=lockedBrand;
-      pmSel.appendChild(o);
-      pmSel.value=lockedBrand;
-      pmSel.disabled=true;
-      paidBrand=lockedBrand;
-    }else{
-      const paidBrands=['all',...new Set(RAW_PAID.map(r=>r.brand).filter(Boolean))].sort((a,b)=>a==='all'?-1:b==='all'?1:a.localeCompare(b));
-      paidBrands.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b==='all'?'All Brands':b;pmSel.appendChild(o);});
-      pmSel.value='all';
-    }
+    paidBrands.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b==='all'?'All Brands':b;pmSel.appendChild(o);});
+    pmSel.value='all';
   }
   buildPMMonthSelect();
   updateDash();
@@ -651,7 +653,6 @@ function updateCard(){
   const per=months.length?fmtM(months[0])+' – '+fmtM(months[months.length-1]):'—';
   document.getElementById('bcPer').textContent=per+' · '+months.length+' months';
   document.getElementById('tbTitle').textContent=brand+' — Performance';
-  const lockEl=document.getElementById('bcLock');if(lockEl)lockEl.style.display=LOCKED_BRAND?'block':'none';
 }
 function onBrandChange(){brand=document.getElementById('brandSelect').value;periodFrom='all';periodTo='all';buildPeriodSelect();updateCard();updateDash();}
 function showPanel(name){
@@ -1563,13 +1564,15 @@ async function downloadAllPDF(){
     ov:['cReach','cER','cFoll'],
     mo:['cFBMo','cIGMo','cEngSplit','cOvB'],
     cb:['cCatEng_org','cCatEng_boost'],
-    bm:['cBmReach','cBmEng','cBmEngER']
+    bm:['cBmReach','cBmEng','cBmEngER'],
+    pm:['cPMSpend','cPMCampaign','cPMCpr','cPMCpm']
   };
   const SECTIONS=[
     {id:'ov',title:'Overview',render:renderOV},
     {id:'mo',title:'Monthly Performance',render:renderMO},
     {id:'cb',title:'Content Breakdown',render:renderCB},
-    {id:'bm',title:'Benchmark',render:renderBM}
+    {id:'bm',title:'Benchmark',render:renderBM},
+    {id:'pm',title:'Paid Media',render:renderPM}
   ];
 
   function hdr(pageNum,title){

@@ -1,0 +1,123 @@
+{
+  "session_title": "TCO Dashboard Development — Client Performance",
+  "exported": "2026-09-09",
+  "user_email": "neuy@thechosenone.agency",
+  "workspace_folder": "Client Performance",
+
+  "project_overview": {
+    "description": "Two TCO (The Chosen One Agency) internal benchmark dashboards built from Excel data exports.",
+    "dashboards": [
+      {
+        "name": "Main Client Dashboard",
+        "file": "public/index.html",
+        "description": "Per-client organic + paid media analytics. Loads data from Apps Script or local data.json fallback. Has panels: Overview, Organic, Content, Summary, Paid Media.",
+        "data_source_primary": "https://script.google.com/macros/s/AKfycbyY6R_dGFKuiQN7IV2yiMVyjCsnhb1YxKmwIFu-YUpSBoPVPuK4FUvav3FThw6HH1SK/exec",
+        "data_source_fallback": "public/data.json",
+        "notes": "Apps Script only returns organic/content/summary. data.json also contains paid array."
+      },
+      {
+        "name": "Industry Benchmark Dashboard",
+        "file": "tco-dashboard-preview.html",
+        "description": "Industry-first view with hardcoded JS data objects. Shows organic MoM benchmarks and paid media by industry (F&B, Hotel, Real Estate, Other). Data: Jul 2025–Aug 2026.",
+        "data_coverage": {
+          "organic": "Jul 2025 – Aug 2026",
+          "paid": "Jan 2026 – Aug 2026"
+        }
+      }
+    ]
+  },
+
+  "source_files": {
+    "excel_organic": "uploads/TCO - Data Hub-9e9a4663.xlsx",
+    "excel_paid": "uploads/TCO__Paid_Media_Tracking_Sheet.xlsx",
+    "data_json": "public/data.json",
+    "apps_script": "Code.gs"
+  },
+
+  "data_json_structure": {
+    "organic": "582 records — {month, brand, industry, platform, followers, reach, impressions, engagements, er_pct, top_organic, organic_link, organic_category, organic_type, top_boosted, boosted_link, boosted_category, boosted_type, notes}",
+    "content": "480 records — {month, brand, industry, platform, type, title, link, category, post_type, engagement, reach, views, shares, saves}",
+    "summary": "29 records — {industry, brand, status, period, fb_follower_growth, fb_total_reach, fb_total_eng, ig_follower_growth, ig_reach_growth, ig_eng_growth}",
+    "paid": "463 records — {month, brand, industry, platform, campaign_type, spend, results, cpr, impressions, reach, cpm, ctr, leads, cpl, top_campaign}"
+  },
+
+  "excel_sheet_notes": {
+    "organic_sheet": "Brand Data (Industry) - Organic — header row 3, data from row 4. Industry label rows have no Platform value. Month and Brand forward-fill.",
+    "paid_sheet": "Paid Media Data — title rows 1-2 skip, header row 3 skip, data from row 4. Columns: Month, Brand, Industry, Platform, Campaign Type, Spend ฿, Results, Cost per Result ฿, Impressions, Reach, CPM ฿, CTR%, Registers/Leads, CPA/CPL ฿, Top Campaign/Creative",
+    "er_pct_normalization": "ER% raw values from Excel stored as fraction (e.g. 0.0041 = 0.41%). Normalization: if er_pct < 2, multiply by 100. In BRAND_PERF data, er is computed as engagements/reach*100."
+  },
+
+  "brand_name_updates": {
+    "SEEN": "Seen Restaurant & Bar Bangkok",
+    "Man Ho": "Man Ho Bistro",
+    "Reference (Sathon)": "Reference Sathorn - Wongwianyai",
+    "GCP SPACE": "Grande Centre Point Space Pattaya",
+    "GCPPTY": "Grande Centre Point Pattaya",
+    "GCP Prestige": "Grande Centre Point Prestige"
+  },
+
+  "industry_benchmark_data_objects": {
+    "ORG": "Monthly avg reach/engagement per industry per platform (fb/ig). Keys: fnb, hotel, restate, other. Sub-keys: fb, ig. Values: {YYYY-MM: {r, e}}. Covers Jul 2025–Aug 2026.",
+    "BRAND_PERF": "Per-brand top post data per industry per month. Keys: fnb, hotel, restate, other. Values: {YYYY-MM: {fb:[{n,f,r,e,er,cat}], ig:[...]}}. Covers Jul 2025–Aug 2026.",
+    "TOP_BRANDS": "All-time cumulative totals per brand. Array of {name, industry, fb_reach, fb_eng, ig_reach, ig_eng}.",
+    "PAID_FNB": "F&B paid media by month. {YYYY-MM: [{brand, obj, result, cpr, spend, cpm}]}. Brands: Hanare, PolaPola, SōL Phuket, HEH.",
+    "PAID_HOTEL": "Hotel paid media. Brand: Sheraton Grande Sukhumvit. {YYYY-MM: [{brand, obj, spend, reach, cpm}]}.",
+    "PAID_RE": "Real Estate paid media. Brands: Panarah, Phetcharat Group. {YYYY-MM: [{brand, obj, spend, reach, cpm}]}.",
+    "PAID_ECOMM": "E-commerce paid (Jul–Sep 2025 only). Brands: Pola Pola, Banpong."
+  },
+
+  "paid_media_brands_in_tracking_sheet": [
+    "Baansukapan", "Banpong Fujisan", "EDL Laminate", "Erawan Bangkok",
+    "First Day", "HEH", "Hanare", "Keehin", "MUNIQ Charoenkrung",
+    "Panarah", "Phetcharat Group", "PolaPola", "SPR Solar Power Roof",
+    "Sheraton Grande Sukhumvit", "Siam Steel Gratings", "Social Diamond",
+    "SōL Phuket", "Tanyarin"
+  ],
+
+  "dashboard_current_state": {
+    "active_month_all_industries": "2026-08",
+    "industry_months_available": ["2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08"]
+  },
+
+  "completed_work": [
+    "Generated data.json from both Excel files (organic, content, summary, paid arrays)",
+    "Added Paid Media panel to index.html with brand/month filters, KPI cards, 4 charts, detail table",
+    "Updated loadData() in index.html to try Apps Script first, fall back to data.json",
+    "Updated tco-dashboard-preview.html: added Apr–Aug 2026 ORG data for all 4 industries",
+    "Updated tco-dashboard-preview.html: updated TOP_BRANDS with new all-time totals and corrected brand names",
+    "Updated tco-dashboard-preview.html: added PAID_FNB Aug 2026, PAID_HOTEL Aug 2026, PAID_RE Aug 2026",
+    "Updated tco-dashboard-preview.html: added BRAND_PERF fnb Apr–Aug 2026",
+    "Updated tco-dashboard-preview.html: added BRAND_PERF hotel Apr–Aug 2026 (with corrected brand names)",
+    "Updated tco-dashboard-preview.html: added BRAND_PERF restate Apr–Aug 2026",
+    "Updated tco-dashboard-preview.html: added BRAND_PERF other Apr–Aug 2026",
+    "Updated all month tab bars to include Aug 26 as active default",
+    "Updated currentMonth to 2026-08 for all industries",
+    "Updated BRAND_PERF_CFG months arrays through 2026-08",
+    "Updated banner, data period chips, and date labels to Jul 2025–Aug 2026"
+  ],
+
+  "pending_actions": {
+    "github_push": {
+      "description": "Push index.html and data.json to GitHub Pages",
+      "commands": [
+        "cd ~/Claude/Dashboard/\"Client Performance\"",
+        "git add public/index.html public/data.json",
+        "git commit -m \"Add Paid Media panel + Aug 2026 data\"",
+        "git push"
+      ]
+    },
+    "apps_script_update": {
+      "description": "Code.gs currently only returns organic/content/summary — does NOT include paid data. To add paid: extend doGet() to also read and return paid array from TCO__Paid_Media_Tracking_Sheet.",
+      "apps_script_url": "https://script.google.com/macros/s/AKfycbyY6R_dGFKuiQN7IV2yiMVyjCsnhb1YxKmwIFu-YUpSBoPVPuK4FUvav3FThw6HH1SK/exec"
+    }
+  },
+
+  "key_technical_notes": [
+    "Chart.js version 4.4.1 used for Paid Media panel charts in index.html",
+    "openpyxl used with read_only=True, data_only=True to parse Excel files",
+    "ER% in BRAND_PERF is always computed as: engagements / reach * 100 (not from Excel ER column)",
+    "Month format throughout: YYYY-MM strings",
+    "industry values are uppercase: FNB, HOTEL, RESTATE, OTHER (in organic/content/summary data)",
+    "Apps Script forward-fills Month, Brand, Industry when blank rows appear"
+  ]
+}
