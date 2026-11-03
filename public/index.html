@@ -1511,6 +1511,19 @@ function renderPM(){
 }
 
 // ── START ─────────────────────────────────────────────────────
+// Guard: the sheet script can leak a date into the industry column when a row has a blank Platform cell
+function sanitizeIndustry(){
+  const VALID=new Set(['REAL ESTATE','F&B','HOTEL','OTHER INDUSTRY']);
+  const byBrand={};
+  RAW_ORGANIC.forEach(r=>{ if(VALID.has(r.industry)){ (byBrand[r.brand]=byBrand[r.brand]||{})[r.industry]=((byBrand[r.brand]||{})[r.industry]||0)+1; } });
+  const pick=b=>{const o=byBrand[b];if(!o)return null;return Object.keys(o).sort((a,c)=>o[c]-o[a])[0];};
+  const fromOther=b=>{
+    const s=RAW_SUMMARY.find(x=>x.brand===b&&VALID.has(x.industry)); if(s)return s.industry;
+    const c=RAW_CONTENT.find(x=>x.brand===b&&VALID.has(x.industry)); return c?c.industry:null;
+  };
+  RAW_ORGANIC.forEach(r=>{ if(!VALID.has(r.industry)) r.industry=pick(r.brand)||fromOther(r.brand)||'OTHER INDUSTRY'; });
+}
+
 async function loadData(){
   const overlay=document.getElementById('dataLoading');
   const sub=document.getElementById('dataLoadingSub');
@@ -1526,6 +1539,7 @@ async function loadData(){
       RAW_CONTENT=Array.isArray(d.content)?d.content:[];
       RAW_SUMMARY=Array.isArray(d.summary)?d.summary:[];
       RAW_PAID   =Array.isArray(d.paid)?d.paid:[];
+      sanitizeIndustry();
       if(sub) sub.textContent='Live data loaded — '+RAW_ORGANIC.length+' organic records, '+RAW_PAID.length+' paid rows';
       loaded=true;
     }catch(err){
@@ -1542,6 +1556,7 @@ async function loadData(){
       RAW_CONTENT=Array.isArray(d.content)?d.content:[];
       RAW_SUMMARY=Array.isArray(d.summary)?d.summary:[];
       RAW_PAID   =Array.isArray(d.paid)?d.paid:[];
+      sanitizeIndustry();
       if(sub) sub.textContent='Data loaded — '+RAW_ORGANIC.length+' organic, '+RAW_PAID.length+' paid rows';
     }catch(err){
       console.error('Data load failed:',err);
