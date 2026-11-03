@@ -3,7 +3,7 @@
 // ============================================================
 
 const SHEET_ORGANIC = 'Brand Data (Industry) - Organic';
-const SHEET_CONTENT = 'Brand Data (Industry) - Content Performance';
+const SHEET_CONTENT = 'Brand Data (Industry) - Content';
 const SHEET_SUMMARY = 'Brand Summary - Organic';
 
 // ============================================================
@@ -42,16 +42,29 @@ function readOrganic(ss) {
   let curIndustry = '';
   let curBrand    = '';
   let curMonth    = null;
+  let lastPlatform = '';
 
   for (let i = 3; i < values.length; i++) {
     const row = values[i];
     if (row.every(v => v === null || v === '' || v === undefined)) continue;
 
-    const platform = row[2] ? String(row[2]).trim() : null;
+    let platform = row[2] ? String(row[2]).trim() : null;
+
+    // Blank Platform: a real data row has numbers (Followers / Reach); an industry label row does not.
+    // If the numbers are there but Platform was left blank, infer it:
+    // a row that starts a new month = Facebook, otherwise the opposite of the previous row.
+    if (!platform && (num(row[3]) !== null || num(row[4]) !== null) &&
+        (curBrand || (row[1] !== null && row[1] !== ''))) {
+      const startsMonth = row[0] !== null && row[0] !== '';
+      platform = (!startsMonth && lastPlatform === 'Facebook') ? 'Instagram' : 'Facebook';
+    }
 
     // Industry label rows have no platform value
     if (!platform) {
-      if (row[0]) curIndustry = String(row[0]).trim().toUpperCase();
+      // Only a real text label counts as an industry; a date / "Sep 2025" in col A is an empty month row, not a label
+      const a = row[0];
+      const looksLikeMonth = a instanceof Date || /^\d{4}-\d{2}/.test(String(a)) || /^[A-Za-z]{3,9}\s+\d{4}$/.test(String(a).trim());
+      if (a && !looksLikeMonth) curIndustry = String(a).trim().toUpperCase();
       continue;
     }
 
@@ -60,6 +73,8 @@ function readOrganic(ss) {
     if (row[1] !== null && row[1] !== '') curBrand = String(row[1]).replace(/\n/g, ' ').trim();
 
     if (!curMonth || !curBrand) continue;
+
+    lastPlatform = platform;
 
     organic.push({
       month:            curMonth,

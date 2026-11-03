@@ -1539,6 +1539,17 @@ async function loadData(){
       RAW_CONTENT=Array.isArray(d.content)?d.content:[];
       RAW_SUMMARY=Array.isArray(d.summary)?d.summary:[];
       RAW_PAID   =Array.isArray(d.paid)?d.paid:[];
+      // Fill gaps: add organic rows that data.json has but the live sheet feed does not (live feed always wins)
+      try{
+        const fr=await fetch('data.json?t='+Date.now());
+        if(fr.ok){
+          const fd=await fr.json();
+          const have=new Set(RAW_ORGANIC.map(r=>r.month+'|'+String(r.brand).trim().toLowerCase()+'|'+r.platform));
+          (Array.isArray(fd.organic)?fd.organic:[]).forEach(r=>{
+            if(!have.has(r.month+'|'+String(r.brand).trim().toLowerCase()+'|'+r.platform)) RAW_ORGANIC.push(r);
+          });
+        }
+      }catch(e){console.warn('data.json gap-fill skipped:',e);}
       sanitizeIndustry();
       if(sub) sub.textContent='Live data loaded — '+RAW_ORGANIC.length+' organic records, '+RAW_PAID.length+' paid rows';
       loaded=true;
