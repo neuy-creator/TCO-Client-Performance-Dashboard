@@ -251,7 +251,7 @@ tr:hover td{background:rgba(118,92,255,.04)}
       <div class="chart-row c-1" style="margin-top:16px">
         <div class="chart-box">
           <div class="ct">Reach Trend — Facebook vs Instagram</div>
-          <div class="cs">Monthly reach across all periods</div>
+          <div class="cs" id="csReachOV">Monthly reach across all periods</div>
           <div class="cw" style="height:165px"><canvas id="cReach"></canvas></div>
         </div>
       </div>
@@ -490,6 +490,15 @@ function matchContent(brand){
     const rl=norm(r.brand);
     return rl===bl||rl.startsWith(bl)||bl.startsWith(rl);
   });
+}
+function inPd(m){
+  if(periodFrom!=='all'&&m<periodFrom)return false;
+  if(periodTo!=='all'&&m>periodTo)return false;
+  return true;
+}
+function periodLabel(){
+  if(periodFrom==='all'&&periodTo==='all')return 'All Time';
+  return (periodFrom==='all'?'Start':fmtM(periodFrom))+' → '+(periodTo==='all'?'Latest':fmtM(periodTo));
 }
 function filterPd(months){
   if(periodFrom==='all'&&periodTo==='all')return months;
@@ -757,28 +766,29 @@ function renderOV(){
     kpiCard('Avg ER%',`<span class="ig-col">${fmtP(igER)}</span>`,gBadge(igER,prevIgER),pDesc);
 
   // Reach trend
+  {const e=document.getElementById('csReachOV');if(e)e.textContent=(periodFrom==='all'&&periodTo==='all')?'Monthly reach across all periods':'Monthly reach · '+lbl;}
   dc('cReach');
-  const fbR=allM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Facebook');return r?r.reach:null;});
-  const igR=allM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Instagram');return r?r.reach:null;});
-  CC['cReach']=new Chart(document.getElementById('cReach'),{type:'line',data:{labels:allM.map(fmtM),datasets:[
+  const fbR=pM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Facebook');return r?r.reach:null;});
+  const igR=pM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Instagram');return r?r.reach:null;});
+  CC['cReach']=new Chart(document.getElementById('cReach'),{type:'line',data:{labels:pM.map(fmtM),datasets:[
     {label:'Facebook',data:fbR,borderColor:'#4a7fe8',backgroundColor:'rgba(74,127,232,.1)',fill:true,tension:.4,pointRadius:4,borderWidth:2,spanGaps:true},
     {label:'Instagram',data:igR,borderColor:'#E1306C',backgroundColor:'rgba(225,48,108,.07)',fill:true,tension:.4,pointRadius:4,borderWidth:2,spanGaps:true}
   ]},options:mxo(C,{interaction:{mode:'index',intersect:false}})});
 
   // ER%
   dc('cER');
-  CC['cER']=new Chart(document.getElementById('cER'),{type:'line',data:{labels:allM.map(fmtM),datasets:[
-    {label:'FB ER%',data:allM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Facebook');return r?erV(r):null;}),borderColor:'#4a7fe8',fill:false,tension:.4,pointRadius:4,borderWidth:2,spanGaps:true},
-    {label:'IG ER%',data:allM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Instagram');return r?erV(r):null;}),borderColor:'#E1306C',fill:false,tension:.4,pointRadius:4,borderWidth:2,spanGaps:true}
+  CC['cER']=new Chart(document.getElementById('cER'),{type:'line',data:{labels:pM.map(fmtM),datasets:[
+    {label:'FB ER%',data:pM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Facebook');return r?erV(r):null;}),borderColor:'#4a7fe8',fill:false,tension:.4,pointRadius:4,borderWidth:2,spanGaps:true},
+    {label:'IG ER%',data:pM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Instagram');return r?erV(r):null;}),borderColor:'#E1306C',fill:false,tension:.4,pointRadius:4,borderWidth:2,spanGaps:true}
   ]},options:mxo(C,{interaction:{mode:'index',intersect:false},scales:{y:{ticks:{callback:v=>v.toFixed(2)+'%',color:tickC(),font:{size:10}}}}})});
 
   // Follower growth with bar labels
   dc('cFoll');
   const fbFR=allM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Facebook');return r&&r.followers!=null?r.followers:null;});
   const igFR=allM.map(m=>{const r=rows.find(x=>x.month===m&&x.platform==='Instagram');return r&&r.followers!=null?r.followers:null;});
-  CC['cFoll']=new Chart(document.getElementById('cFoll'),{type:'bar',data:{labels:allM.map(fmtM),datasets:[
-    {label:'FB Gain',data:allM.map((_,i)=>i===0||fbFR[i]==null||fbFR[i-1]==null?null:fbFR[i]-fbFR[i-1]),backgroundColor:'rgba(74,127,232,.5)',borderColor:'#4a7fe8',borderWidth:1,borderRadius:3},
-    {label:'IG Gain',data:allM.map((_,i)=>i===0||igFR[i]==null||igFR[i-1]==null?null:igFR[i]-igFR[i-1]),backgroundColor:'rgba(225,48,108,.45)',borderColor:'#E1306C',borderWidth:1,borderRadius:3}
+  CC['cFoll']=new Chart(document.getElementById('cFoll'),{type:'bar',data:{labels:pM.map(fmtM),datasets:[
+    {label:'FB Gain',data:pM.map(m=>{const i=allM.indexOf(m);return i<=0||fbFR[i]==null||fbFR[i-1]==null?null:fbFR[i]-fbFR[i-1];}),backgroundColor:'rgba(74,127,232,.5)',borderColor:'#4a7fe8',borderWidth:1,borderRadius:3},
+    {label:'IG Gain',data:pM.map(m=>{const i=allM.indexOf(m);return i<=0||igFR[i]==null||igFR[i-1]==null?null:igFR[i]-igFR[i-1];}),backgroundColor:'rgba(225,48,108,.45)',borderColor:'#E1306C',borderWidth:1,borderRadius:3}
   ]},options:{...mxo(C,{layout:{padding:{top:26}}}),_barLabels:true}});
 }
 
@@ -786,8 +796,8 @@ function renderOV(){
 function renderMO(){
   const C=getChartOpts();
   const rows=RAW_ORGANIC.filter(r=>r.brand===brand);
-  const months=getMonths(brand);
-  const cRows=matchContent(brand);
+  const months=filterPd(getMonths(brand));
+  const cRows=matchContent(brand).filter(r=>inPd(r.month));
   const cMonths=[...new Set(cRows.map(r=>r.month))].sort();
   document.getElementById('mo-b').textContent=months.length?fmtM(months[0])+' – '+fmtM(months[months.length-1]):'—';
 
@@ -868,7 +878,7 @@ function renderMO(){
     </tr></thead><tbody>`;
     months.forEach((m,i)=>{
       const cur=rows.find(r=>r.month===m&&r.platform===plat);
-      const prv=i>0?rows.find(r=>r.month===months[i-1]&&r.platform===plat):null;
+      const fullM=getMonths(brand),pi=fullM.indexOf(m);const prv=pi>0?rows.find(r=>r.month===fullM[pi-1]&&r.platform===plat):null;
       const gained=cur&&prv&&cur.followers!=null&&prv.followers!=null?cur.followers-prv.followers:null;
       const gainedBadge=gained!=null?(gained>=0?`<span class="up">+${fmtFull(gained)}</span>`:`<span class="dn">${fmtFull(gained)}</span>`):'';
       t+=`<tr>
@@ -888,7 +898,7 @@ function renderMO(){
 // ── CONTENT BREAKDOWN ─────────────────────────────────────────
 function renderCB(){
   const C=getChartOpts();
-  const cRows=matchContent(brand);
+  const cRows=matchContent(brand).filter(r=>inPd(r.month));
   const cMonths=[...new Set(cRows.map(r=>r.month))].sort();
   document.getElementById('cb-b').textContent=cMonths.length?fmtM(cMonths[0])+' – '+fmtM(cMonths[cMonths.length-1]):'—';
 
@@ -931,7 +941,7 @@ function setPostFilter(f){
 }
 function renderTopPosts(){
   const sortKey=document.getElementById('postSort')?.value||'engagement';
-  let rows=matchContent(brand);
+  let rows=matchContent(brand).filter(r=>inPd(r.month));
   if(postTypeFilter!=='all')rows=rows.filter(r=>r.type===postTypeFilter);
   rows=rows.filter(r=>r[sortKey]!=null).sort((a,b)=>b[sortKey]-a[sortKey]).slice(0,15);
   if(!rows.length){document.getElementById('topPostsTable').innerHTML='<div class="no-data">No posts found for this selection</div>';return;}
@@ -956,9 +966,9 @@ function renderTopPosts(){
 function renderBM(){
   const C=getChartOpts();
   const ind=getInd(brand);
-  document.getElementById('bm-b').textContent=brand+' vs '+ind+' Average';
-  const indRows=RAW_ORGANIC.filter(r=>r.industry===ind);
-  const brandRows=RAW_ORGANIC.filter(r=>r.brand===brand);
+  document.getElementById('bm-b').textContent=brand+' vs '+ind+' Average'+((periodFrom==='all'&&periodTo==='all')?'':' · '+periodLabel());
+  const indRows=RAW_ORGANIC.filter(r=>r.industry===ind&&inPd(r.month));
+  const brandRows=RAW_ORGANIC.filter(r=>r.brand===brand&&inPd(r.month));
   const indBrands=[...new Set(indRows.map(r=>r.brand))];
   function iA(metric,plat){return avg(indBrands.map(b=>avg(indRows.filter(r=>r.brand===b&&r.platform===plat).map(r=>r[metric]).filter(v=>v!=null))).filter(v=>v>0));}
   function bA(metric,plat){return avg(brandRows.filter(r=>r.platform===plat).map(r=>r[metric]).filter(v=>v!=null));}
@@ -987,7 +997,7 @@ function renderBM(){
         const display=val!=null?(prefix+fmtFull(val)):'—';
         return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700;margin-bottom:6px">${lbl}</div><div style="font-size:18px;font-weight:800;color:${color}">${display}</div><div style="font-size:10px;color:var(--dim);margin-top:3px">${sub}</div></div>`;
       }
-      const bmBR2=RAW_ORGANIC.filter(r=>r.brand===brand);
+      const bmBR2=RAW_ORGANIC.filter(r=>r.brand===brand&&inPd(r.month));
       const bmFBR2s=bmBR2.filter(r=>r.platform==='Facebook').sort((a,b)=>a.month>b.month?1:-1);
       const bmIGR2s=bmBR2.filter(r=>r.platform==='Instagram').sort((a,b)=>a.month>b.month?1:-1);
       const bmFBFolG2=bmFBR2s.length>=2?(bmFBR2s[bmFBR2s.length-1].followers||0)-(bmFBR2s[0].followers||0):null;
@@ -1062,7 +1072,7 @@ function renderBM(){
       const display=val!=null?(prefix+fmtFull(val)):'—';
       return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);font-weight:700;margin-bottom:6px">${lbl}</div><div style="font-size:18px;font-weight:800;color:${color}">${display}</div><div style="font-size:10px;color:var(--dim);margin-top:3px">${sub}</div></div>`;
     }
-    const bmBR=RAW_ORGANIC.filter(r=>r.brand===brand);
+    const bmBR=RAW_ORGANIC.filter(r=>r.brand===brand&&inPd(r.month));
     const bmFBRows=bmBR.filter(r=>r.platform==='Facebook').sort((a,b)=>a.month>b.month?1:-1);
     const bmIGRows=bmBR.filter(r=>r.platform==='Instagram').sort((a,b)=>a.month>b.month?1:-1);
     const bmFBFolGrowth=bmFBRows.length>=2?(bmFBRows[bmFBRows.length-1].followers||0)-(bmFBRows[0].followers||0):null;
@@ -1096,8 +1106,8 @@ function renderBM(){
 }
 
 function generateInsights(ind,indRows,indBrands,brandRows,bFBER,bIGER,iFBER,iIGER,bA,iA,showIndustry){
-  const cRows=matchContent(brand);
-  const allM=getMonths(brand);
+  const cRows=matchContent(brand).filter(r=>inPd(r.month));
+  const allM=filterPd(getMonths(brand));
 
   // ── Brand-level metrics ──────────────────────────────────────
   const bFBReach=bA('reach','Facebook'),bIGReach=bA('reach','Instagram');
@@ -1294,7 +1304,7 @@ async function downloadPDF(panelId, sectionTitle){
     const pdf = new jsPDF('p','mm','a4');
     function addPageHeader(pageNum){
       pdf.setFontSize(8);pdf.setTextColor(150);
-      pdf.text('The Chosen One Agency  ·  '+brand+' — '+sectionTitle, MARGIN, MARGIN-3);
+      pdf.text('The Chosen One Agency  ·  '+brand+' — '+sectionTitle+'  ·  '+periodLabel(), MARGIN, MARGIN-3);
       pdf.text('Page '+pageNum, PAGE_W-MARGIN, MARGIN-3,{align:'right'});
       pdf.setTextColor(30);
     }
@@ -1374,7 +1384,7 @@ async function downloadPDF(panelId, sectionTitle){
     const now = new Date();
     pdf.text('Generated by TCO Data Hub  ·  '+now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), PAGE_W/2, PAGE_H - 5, {align:'center'});
 
-    const filename = `${brand} - ${sectionTitle} - TCO.pdf`;
+    const filename = `${brand} - ${sectionTitle}${(periodFrom==='all'&&periodTo==='all')?'':' - '+periodLabel().replace(/[→\/]/g,'to').replace(/\s+/g,' ')} - TCO.pdf`;
     pdf.save(filename);
 
   } catch(err){
@@ -1574,7 +1584,7 @@ async function downloadAllPDF(){
 
   function hdr(pageNum,title){
     pdf.setFontSize(8);pdf.setTextColor(150);
-    pdf.text('The Chosen One Agency  ·  '+brand+' — '+title,MARGIN,MARGIN-3);
+    pdf.text('The Chosen One Agency  ·  '+brand+' — '+title+'  ·  '+periodLabel(),MARGIN,MARGIN-3);
     pdf.text('Page '+pageNum,PAGE_W-MARGIN,MARGIN-3,{align:'right'});
     pdf.setTextColor(30);
   }
@@ -1675,7 +1685,7 @@ async function downloadAllPDF(){
     pdf.text('Generated by TCO Data Hub  ·  '+now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),PAGE_W/2,PAGE_H-5,{align:'center'});
 
     sub.textContent='Saving…';
-    pdf.save((brand||'report').replace(/\s+/g,'-')+'-full-report.pdf');
+    pdf.save((brand||'report').replace(/\s+/g,'-')+((periodFrom==='all'&&periodTo==='all')?'':'-'+periodLabel().replace(/[→\/]/g,'to').replace(/\s+/g,'-'))+'-full-report.pdf');
 
   }catch(err){
     console.error('Export All error:',err);
